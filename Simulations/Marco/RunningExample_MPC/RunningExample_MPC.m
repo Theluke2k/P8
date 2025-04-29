@@ -7,7 +7,7 @@ dt = 0.1;               % Time step [s]
 sim_time = 10;          % Simulation time [s]
 T = sim_time/dt;        % Total # of simulation steps
 Ts = 1;                 % MPC sampling time
-sim_params = [Ts, dt];
+sim_params = [Ts, dt];  
 
 % MPC and cost params
 Hp = 6; Hu = 3;

@@ -135,6 +135,7 @@ u_opt = Uprev;
 
 H = zeros(N,size(z,1)); % Initialize linearized H matrix
 for n=1:T
+    disp("")
     % Simulate true process
     w = G*normrnd(mu_w,sigma);
     z(:,n+1) = A*z(:,n) + B*u(:,n) + w;
