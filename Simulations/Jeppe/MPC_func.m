@@ -1,4 +1,4 @@
-function [Z_sol,U_sol,P_trace] = MPC_func(rob_init, kf_init, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
+function [Z_sol,U_sol,P_trace,opti] = MPC_func(rob_init, kf_init, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
 %% Parameters
 import casadi.*
 
@@ -6,6 +6,7 @@ import casadi.*
 xmin = map_bounds(1); xmax = map_bounds(2);
 ymin = map_bounds(3); ymax = map_bounds(4);
 dmin = min_dist;
+vmax = 2;
 
 % MPC parameters
 Hp = mpc_params(1); % Prediction horizon
@@ -153,7 +154,7 @@ for k = 1:Hp
     P_KF_pred(8*(k+1)-7:8*(k+1),:) = A_KF*P_KF_est(8*k-7:8*k,:)*A_KF' + Q;
 
     % Add to cost
-    cost_KF = cost_KF + log(abs(trace(P_KF_pred(8*(k+1)-7:8*(k+1),:) + eps*eye(8))));
+    cost_KF = cost_KF + P_KF_est(8*k-7,1)/20  + P_KF_est(8*k-5,3)*100 + P_KF_est(8*k-3,5) + P_KF_est(8*k-1,7);
 end
 
 % Constraints
@@ -170,7 +171,14 @@ for k = 1:Hp
     % Box constraints
     opti.subject_to(xmin <= Za(1:n_a:N*n_a,k+1) <= xmax);
     opti.subject_to(ymin <= Za(2:n_a:N*n_a,k+1) <= ymax);
-    
+
+    % Velocity constraints
+    for j = 1:N
+        x_vel = Za(3+(j-1)*n_a,k+1);
+        y_vel = Za(4+(j-1)*n_a,k+1);
+        opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
+    end
+
     % Collision avoidance
     for i = 1:N
         for j = i+1:N
@@ -197,7 +205,7 @@ end
 opti.minimize(lambda1*cost + lambda2*cost_KF);
 
 solver_opts = struct;
-solver_opts.ipopt.max_iter = 1000;
+solver_opts.ipopt.max_iter = 2000;
 solver_opts.ipopt.tol = 1e-6;
 solver_opts.ipopt.print_level = verbose_opt;
 % solver_opts.print_time = false;
@@ -225,7 +233,7 @@ U_sol = sol.value(U_opt);
 P_sol = sol.value(P_KF_pred);
 P_trace = [];
 for k = 1:Hp+1
-    P_trace = [P_trace, log(trace(P_sol(8*k-7:8*k,:)))];
+    P_trace = [P_trace, log(abs(trace(P_sol(8*k-7:8*k,:))))];
 end
 
 end

@@ -1,10 +1,10 @@
 %Radiation/chemical leak (running example) model parameter estimation
 clc; clear; close all;
-
+addpath('C:\Program Files\MATLAB/casadi-3.7.0-windows64-matlab2018b')
 %% Process simulation parameters
 N = 3;                  % Number of robots
-dt = 0.1;               % Time step [s]
-sim_time = 10;          % Simulation time [s]
+dt = 0.5;               % Time step [s]
+sim_time = 50;          % Simulation time [s]
 T = sim_time/dt;        % Total # of simulation steps
 Ts = 1;                 % MPC sampling time
 sim_params = [Ts, dt];
@@ -12,19 +12,19 @@ sim_params = [Ts, dt];
 % MPC and cost params
 Hp = 6; Hu = 3;
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [1, 1e4, 1e-6];    % lambda1, lambda2, epsilon
+cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 0.5;                  % Minimum distance between robots
 
 % Map bounderies
-xmin = 0; xmax = 20;
-ymin = 0; ymax = 20;
+xmin = 0; xmax = 40;
+ymin = 0; ymax = 40;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial model parameters
 M_ref = 200;
 beta_ref = 0.1;
-xs_ref = 10;
-ys_ref = 10;
+xs_ref = 20;
+ys_ref = 20;
 
 % Initial derivative states
 M_dot = 0;
@@ -37,25 +37,27 @@ z = zeros(8,T+1);
 z(:,1) = [M_ref; M_dot; beta_ref; beta_dot; xs_ref; xs_dot; ys_ref; ys_dot]; %initial state vector
 
 % Initial model parameters guess
-M = 1e-3;
-beta = 1e-3;
-xs = 8;
-ys = 12;
+M = 200;
+beta = 0.1;
+xs = 20;
+ys = 20;
 
 % Initial states and error covariance matrix
 z_pred = [M; M_dot; beta; beta_dot; xs; xs_dot; ys; ys_dot]; % Initial prediction for kalman filter
 
 % Initial error covariance
-P_pred = 1e-6*ones(size(z,1));
-for i = 1:2:3
-    P_pred(i,i) = 1e-1;
-end
+P_pred = zeros(size(z,1));
+P_pred(1,1) = (M_ref - M)^2;
+P_pred(3,3) = (beta_ref - beta)^2;
+P_pred(5,5) = (xs_ref - xs)^2;
+P_pred(7,7) = (ys_ref - ys)^2;
 kf_init = [z_pred, P_pred];
 
 % Initial robot positions, Z0 and control inputs, Uprev
 X0 = zeros(2*N,1); % (assuming N=4, so 2*N values)
 for j = 1:N
-    X0(2*j-1) = j;
+    X0(2*j-1) = xs_ref + j;
+    X0(2*j) = ys_ref;
 end
 Uprev = zeros(2*N,1);           % (2*N values again)
 
@@ -92,7 +94,7 @@ G = [0.5*dt^2 0 0 0;
     0 0 dt 0;
     0 0 0 0.5*dt^2;
     0 0 0 dt];
-sigma_M = 0.2; sigma_beta = 0.0001; sigma_x = 0.01; sigma_y = 0.01;
+sigma_M = 0.5; sigma_beta = 0.001; sigma_x = 0.2; sigma_y = 0.2;
 sigma = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(sigma),1);
 Q = G*diag([sigma_M sigma_beta sigma_x sigma_y])*G';
@@ -208,7 +210,7 @@ for i = 1:T
     end
     hold off;
     set(gca,'YDir','normal');
-    caxis([I_min I_max]); 
+    %caxis([I_min I_max]); 
     colorbar;
     % title('True Radiation Field');
     title(sprintf('True Radiation Field @t=%.3f',i*dt));
@@ -225,7 +227,7 @@ for i = 1:T
     end
     hold off;
     set(gca,'YDir','normal');
-    caxis([I_min I_max]); 
+    %caxis([I_min I_max]); 
     colorbar;
     % title('Estimated Radiation Field');
     title(sprintf('Estimated Radiation Field @t=%.3f',i*dt));
@@ -233,7 +235,7 @@ for i = 1:T
     ylabel('y'); ylim([ymin, ymax]);
 
     drawnow limitrate;
-    pause(0.001);
+    pause((1/3)*dt);
 end
 
 % Plot state estimates
@@ -241,8 +243,8 @@ figure;
 for i = 1:size(z,1)
     subplot(size(z,1)/2,2,i);
     hold on;
-    plot(0:T-1, z(i,1:T), DisplayName=sprintf("z_{%d}", i));
-    plot(0:T-1, estimates(i,:), '--', DisplayName=sprintf("z_{%d,est}", i));
+    plot(dt*(0:T-1), z(i,1:T), DisplayName=sprintf("z_{%d}", i));
+    plot(dt*(0:T-1), estimates(i,:), '--', DisplayName=sprintf("z_{%d,est}", i));
     hold off;
     legend;
     xlabel("Time [s]");
