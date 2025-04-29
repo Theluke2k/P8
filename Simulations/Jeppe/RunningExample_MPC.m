@@ -1,6 +1,5 @@
 %Radiation/chemical leak (running example) model parameter estimation
 clc; clear; close all;
-addpath('C:\Program Files\MATLAB/casadi-3.7.0-windows64-matlab2018b')
 %% Process simulation parameters
 N = 3;                  % Number of robots
 dt = 0.5;               % Time step [s]
@@ -18,30 +17,47 @@ min_dist = 0.5;                  % Minimum distance between robots
 % Map bounderies
 xmin = 0; xmax = 40;
 ymin = 0; ymax = 40;
+zmin = 0; zmax = 20;
 map_bounds = [xmin, xmax, ymin, ymax];
 
-% True initial model parameters
+% True initial process states
 M_ref = 200;
+M_dot_ref = 0;
+beta_dot_ref = 0;
 beta_ref = 0.1;
 xs_ref = 20;
+xs_dot_ref = 0;
 ys_ref = 20;
+ys_dot_ref = 0;
+z0 = [M_ref; M_dot_ref; beta_dot_ref; beta_ref; xs_ref; xs_dot_ref; ys_ref; ys_dot_ref]; % Initial true state vector
 
-% Initial derivative states
-M_dot = 0;
-beta_dot = 0;
-xs_dot = 0;
-ys_dot = 0;
+% Guessed initial process states
+M_0 = 200;
+M_dot_0 = 0;
+beta_0 = 0.1;
+beta_dot_0 = 0;
+xs_0 = 20;
+xs_dot_0 = 0;
+ys_0 = 20;
+ys_dot_0 = 0;
 
-% Initial true state vector
-z = zeros(8,T+1);
-z(:,1) = [M_ref; M_dot; beta_ref; beta_dot; xs_ref; xs_dot; ys_ref; ys_dot]; %initial state vector
+
+% Define true process and estimated process state vectors
+
+
+% True state vector
+z = zeros(8,T);
+% z(:,1) = [M_ref; M_dot; beta_ref; beta_dot; xs_ref; xs_dot; ys_ref; ys_dot]; % Old code
 
 % Initial model parameters guess
 M = 200;
 beta = 0.1;
 xs = 20;
 ys = 20;
-
+M_dot = 0;
+beta_dot = 0;
+xs_dot = 0;
+ys_dot = 0;
 % Initial states and error covariance matrix
 z_pred = [M; M_dot; beta; beta_dot; xs; xs_dot; ys; ys_dot]; % Initial prediction for kalman filter
 
@@ -128,6 +144,73 @@ y_pred = zeros(N,1); % Storage for output prediction
 
 pos_store = zeros(T,2,N);
 
+%% Plotting preparation
+% Initializations
+x_plot = linspace(xmin,xmax,50);
+y_plot = linspace(ymin,ymax,50)';
+q_plot = h(z(:,1),x_plot,y_plot);
+
+t_vec = (0:T-1) * dt;         % Time vector for plotting
+parameters_time = zeros(T,4); % Vector for storage of parameters (M, beta, xs, ys)
+amplitude_time = zeros(T,1);
+
+field_plot = gobjects(1,1);
+parameter_plot = gobjects(4,1);
+amplitude_plot = gobjects(1,1);
+
+figure(1)
+set(gcf, 'Position',  [100, 200, 1200, 500])
+
+subplot(1,2,1)
+hold on;
+axis([xmin xmax ymin ymax zmin zmax]);
+xlabel('X'); ylabel('Y');
+field_plot(1) = mesh(x_plot,y_plot,q_plot, 'FaceAlpha','0.7', 'EdgeAlpha','0.7');
+view([45 45])
+
+robot_quivers = gobjects(N,1);
+for i = 1:N
+    robot_quivers(i) = quiver(X0(2*i-1), X0(2*i),...
+        0, 0,...
+        'r', 'LineWidth', 4, 'MaxHeadSize', 4);
+end
+
+% Plot initial conditions
+subplot(1,2,1)
+q_plot = h(z(:,n),x_plot,y_plot);
+set(field_plot(1), 'XData', x_plot, 'YData', y_plot, 'ZData', q_plot)
+
+%Update robot animation
+for i = 1:N
+    set(robot_quivers(i), ...
+        'XData', pos_store(n,1,i), ...
+        'YData', pos_store(n,2,i));
+end
+
+subplot(1,2,2)
+%update parameter and estimates plot
+for i=1:4
+    set(parameter_plot(i), 'XData', t_vec(1:n),'YData', parameters_time(1:n,i))
+end
+%set(amplitude_plot(1), 'XData', t_vec(1:n),'YData', amplitude_time(1:n))
+set(estimate_plot(1), 'XData', t_vec(1:n), 'YData', estimates(1,1:n) %leak rate M_dot
+set(estimate_plot(2), 'XData', t_vec(1:n), 'YData', estimates(3,1:n)) %beta
+set(estimate_plot(3), 'XData', t_vec(1:n), 'YData', estimates(5,1:n)) %x position
+
+subplot(1,2,2)
+parameter_plot(1) = plot(nan,nan,'DisplayName','$M$','Color','b');
+hold on
+parameter_plot(2) = plot(nan,nan,'DisplayName','$\beta$','Color','r');
+parameter_plot(3) = plot(nan,nan,'DisplayName','$x_s$','Color','g');
+parameter_plot(4) = plot(nan,nan,'DisplayName','$y_s$','Color','k');
+%amplitude_plot(1) = plot(nan,nan);
+estimate_plot(1) = plot(nan,nan,'DisplayName','$\hat{M}$','Color','b','LineStyle','--');
+estimate_plot(2) = plot(nan,nan,'DisplayName','$\hat{\beta}$','Color','r','LineStyle','--');
+estimate_plot(3) = plot(nan,nan,'DisplayName','$\hat{x_s}$','Color','g','LineStyle','--');
+estimate_plot(4) = plot(nan,nan,'DisplayName','$\hat{y_s}$','Color','k','LineStyle','--');
+xlabel('Time [s]')
+legend('Interpreter','latex','Location','west')
+
 %% Simulation loop
 x_opt = X0;
 u_opt = Uprev;
@@ -138,7 +221,8 @@ for n=1:T
     disp("")
     % Simulate true process
     w = G*normrnd(mu_w,sigma);
-    z(:,n+1) = A*z(:,n) + B*u(:,n) + w;
+    z(:,n+1) = A*z(:,n) + B*u(:,n) + w; % NOTE: dynamics are updated as z(n+1), but z(n) are still used in the following
+    parameters_time(:,n) = [z(1,n);z(3,n);z(5,n);z(7,n)];
 
     % Measurement update
     for i = 1:N
@@ -175,6 +259,29 @@ for n=1:T
     [X_opt, U_opt, P_trace] = MPC_func(rob_init, kf_init, mpc_params, cost_params, N, map_bounds, min_dist, sim_params, 3);
     u_opt = U_opt(:,2);
     x_opt = X_opt(:,2);
+
+    % Update plot
+    subplot(1,2,1)
+    q_plot = h(z(:,n),x_plot,y_plot);
+    set(field_plot(1), 'XData', x_plot, 'YData', y_plot, 'ZData', q_plot)
+    
+    %Update robot animation
+    for i = 1:N
+    set(robot_quivers(i), ...
+        'XData', pos_store(n,1,i), ...
+        'YData', pos_store(n,2,i));
+    end
+    
+    subplot(1,2,2)
+    %update parameter and estimates plot
+    for i=1:4
+    set(parameter_plot(i), 'XData', t_vec(1:n),'YData', parameters_time(1:n,i))
+    end
+    %set(amplitude_plot(1), 'XData', t_vec(1:n),'YData', amplitude_time(1:n))
+    set(estimate_plot(1), 'XData', t_vec(1:n), 'YData', estimates(1,1:n) %leak rate M_dot
+    set(estimate_plot(2), 'XData', t_vec(1:n), 'YData', estimates(3,1:n)) %beta
+    set(estimate_plot(3), 'XData', t_vec(1:n), 'YData', estimates(5,1:n)) %x position
+    set(estimate_plot(4), 'XData', t_vec(1:n), 'YData', estimates(7,1:n)) %y position
 end
 
 %% Plots 
@@ -185,59 +292,59 @@ x_vis = linspace(xmin,xmax,nx_vis);
 y_vis = linspace(ymin,ymax,ny_vis);
 [X_vis, Y_vis] = meshgrid(x_vis, y_vis);
 
-figure;
-for i = 1:T
-    I_max_true = max(z(1,i))*max(z(3,i))/pi;
-    I_max_est = max(estimates(1,i))*max(estimates(3,i))/pi;
-    I_max = max(I_max_true, I_max_est);
-
-    I_min_true = min(z(1,i))*min(z(3,i))/pi;
-    I_min_est = min(estimates(1,i))*min(estimates(3,i))/pi;
-    I_min = min(I_min_true, I_min_est);
-    if I_min >= 0
-        I_min = 0;
-    end
-
-    q_true = (z(1,i)*z(3,i)/pi)*exp(-z(3,i)*((X_vis - z(5,i)).^2 + (Y_vis - z(7,i)).^2));
-    q_est = (estimates(1,i)*estimates(3,i)/pi)*exp(-estimates(3,i)*((X_vis - estimates(5,i)).^2 + (Y_vis - estimates(7,i)).^2));
-
-    subplot(1,2,1);
-    cla;
-    hold on;
-    imagesc(x_vis, y_vis, q_true);
-    for j = 1:N
-        pos = pos_store(i,:,j); % drone position at step i
-        plot(pos(1), pos(2), 'ko', 'MarkerFaceColor','w', 'MarkerSize',10);
-    end
-    hold off;
-    set(gca,'YDir','normal');
-    %caxis([I_min I_max]); 
-    colorbar;
-    % title('True Radiation Field');
-    title(sprintf('True Radiation Field @t=%.3f',i*dt));
-    xlabel('x'); xlim([xmin, xmax]);
-    ylabel('y'); ylim([ymin, ymax]);
-
-    subplot(1,2,2);
-    cla;
-    hold on;
-    imagesc(x_vis, y_vis, q_est);
-    for j = 1:N
-        pos = pos_store(i,:,j); % drone position at step i
-        plot(pos(1), pos(2), 'ko', 'MarkerFaceColor','w', 'MarkerSize',10);
-    end
-    hold off;
-    set(gca,'YDir','normal');
-    %caxis([I_min I_max]); 
-    colorbar;
-    % title('Estimated Radiation Field');
-    title(sprintf('Estimated Radiation Field @t=%.3f',i*dt));
-    xlabel('x'); xlim([xmin, xmax]);
-    ylabel('y'); ylim([ymin, ymax]);
-
-    drawnow limitrate;
-    pause((1/3)*dt);
-end
+% figure;
+% for i = 1:T
+%     I_max_true = max(z(1,i))*max(z(3,i))/pi;
+%     I_max_est = max(estimates(1,i))*max(estimates(3,i))/pi;
+%     I_max = max(I_max_true, I_max_est);
+% 
+%     I_min_true = min(z(1,i))*min(z(3,i))/pi;
+%     I_min_est = min(estimates(1,i))*min(estimates(3,i))/pi;
+%     I_min = min(I_min_true, I_min_est);
+%     if I_min >= 0
+%         I_min = 0;
+%     end
+% 
+%     q_true = (z(1,i)*z(3,i)/pi)*exp(-z(3,i)*((X_vis - z(5,i)).^2 + (Y_vis - z(7,i)).^2));
+%     q_est = (estimates(1,i)*estimates(3,i)/pi)*exp(-estimates(3,i)*((X_vis - estimates(5,i)).^2 + (Y_vis - estimates(7,i)).^2));
+% 
+%     subplot(1,2,1);
+%     cla;
+%     hold on;
+%     imagesc(x_vis, y_vis, q_true);
+%     for j = 1:N
+%         pos = pos_store(i,:,j); % drone position at step i
+%         plot(pos(1), pos(2), 'ko', 'MarkerFaceColor','w', 'MarkerSize',10);
+%     end
+%     hold off;
+%     set(gca,'YDir','normal');
+%     %caxis([I_min I_max]); 
+%     colorbar;
+%     % title('True Radiation Field');
+%     title(sprintf('True Radiation Field @t=%.3f',i*dt));
+%     xlabel('x'); xlim([xmin, xmax]);
+%     ylabel('y'); ylim([ymin, ymax]);
+% 
+%     subplot(1,2,2);
+%     cla;
+%     hold on;
+%     imagesc(x_vis, y_vis, q_est);
+%     for j = 1:N
+%         pos = pos_store(i,:,j); % drone position at step i
+%         plot(pos(1), pos(2), 'ko', 'MarkerFaceColor','w', 'MarkerSize',10);
+%     end
+%     hold off;
+%     set(gca,'YDir','normal');
+%     %caxis([I_min I_max]); 
+%     colorbar;
+%     % title('Estimated Radiation Field');
+%     title(sprintf('Estimated Radiation Field @t=%.3f',i*dt));
+%     xlabel('x'); xlim([xmin, xmax]);
+%     ylabel('y'); ylim([ymin, ymax]);
+% 
+%     drawnow limitrate;
+%     pause((1/3)*dt);
+% end
 
 % Plot state estimates
 figure;
