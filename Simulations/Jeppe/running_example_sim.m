@@ -2,7 +2,7 @@
 clear all
 close all
 %% Process simulation parameters
-N = 5;                  % Number of robots
+N = 3;                  % Number of robots
 dt = 0.1;               % Time step [s]
 sim_time = 100;          % Simulation time [s]
 T = sim_time/dt;        % Total # of simulation steps

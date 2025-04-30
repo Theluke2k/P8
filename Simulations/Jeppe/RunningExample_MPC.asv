@@ -4,11 +4,10 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.1;               % Sampling period [s]
-sim_time = 500;          % Simulation time [s]
+sim_time = 50;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 1;                 % MPC sampling period
 sim_params = [Ts, dt];
-selec = [5, 7];            % Select states to plot
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
@@ -35,7 +34,7 @@ ys_dot_ref = 0;
 z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_dot_ref]; % Initial true state vector
 
 % Guessed initial process states
-M_0 = 0;
+M_0 = 250;
 M_dot_0 = 0;
 beta_0 = 0.05;
 beta_dot_0 = 0;
@@ -56,8 +55,8 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = xs_ref;
-    x_1(2*m) = ys_ref;
+    x_1(2*m-1) = xmin + m*2;
+    x_1(2*m) = ymin;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
@@ -80,10 +79,10 @@ x(:,2) = x_1;
 P(:,:,1) = P_0;
 
 %% Dynamic Parameter Model
-tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
+tau_beta = 0.998;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
-beta0 = 0.05; %steady-state value for beta
+beta0 = 0; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
 u_M = 2; % Leakage rate offset
 u = ones(2,K+1);
@@ -101,7 +100,7 @@ A = [1 dt 0 0 0 0 0 0;
      0 0 0 0 0 0 0 1];
 
 % Process input matrix
-B = zeros(N,2);
+B = zeros(size(z,1),2);
 B(1,1) = dt; B(3,2) = dt;
 
 % Process noise (Q)
@@ -113,14 +112,14 @@ G = [0.5*dt^2 0 0 0;
     0 0 dt 0;
     0 0 0 0.5*dt^2;
     0 0 0 dt];
-sigma_M = 1; sigma_beta = 0.01; sigma_x = 0.01; sigma_y = 0.01;
+sigma_M = 0.2; sigma_beta = 0.0001; sigma_x = 0.01; sigma_y = 0.01;
 sigma = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(sigma),1);
 Q = G*diag([sigma_M sigma_beta sigma_x sigma_y])*G'; % This is the process noise covariance matrix
 
 % Measurement noise
-sigma_measurement = 0.01;
-mu_r = zeros(M,1);
+sigma_measurement = 0.1;
+mu_r = le
 R = sigma_measurement*eye(M); % measurement noise covariance
 
 % Measurement model - h_i(z,x,y) = (M*beta/pi)*exp(-beta*((x-xs).^2 + (y-ys).^2))
@@ -182,9 +181,15 @@ x_axis = linspace(xmin,xmax,50);    % Process x-axis
 y_axis = linspace(ymin,ymax,50)';   % Process y-axis
 z_values = h_m(z_0,x_axis,y_axis);    % Process values in defined area
 t_vec = (0:K) * dt;               % Time vector for plotting
+z_selected = zeros(4,K+1);          % Vector for storage of selected true process states
+z_est_selected = zeros(4,K+1);      % Vector for storage of selected estimated process states
+z_selected(:,1) = [z_0(1);z_0(3);z_0(5);z_0(7)];   % Plug in initial states as first column
+z_est_selected(:,1) = [z_est_0(1);z_est_0(3);z_est_0(5);z_est_0(7)];   % Plug in initial guessed states as first column
 
 % Initialize plotting objects that can be updated 
 process_plot = gobjects(1,1);         
+z_selected_plot = gobjects(4,1);
+z_est_selected_plot = gobjects(4,1);
 
 % Initial process plot setup
 figure(1)
@@ -204,23 +209,17 @@ for m = 1:M
         'r', 'LineWidth', 4, 'MaxHeadSize', 4);
 end
 
-% Plot selected states
-z_selected = zeros(length(selec),K+1);          % Vector for storage of selected true process states
-z_est_selected = zeros(length(selec),K+1);      % Vector for storage of selected estimated process states
-colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
-z_selected_plot = gobjects(size(z_selected,1),1);
-z_est_selected_plot = gobjects(size(z_selected,1),1);
-subplot(1,2,2)
-hold on
-for i = 1:length(selec)
-    s = selec(i);
-    z_selected(i,1) = z_0(s);   % Plug in initial states as first column
-    z_est_selected(i,1) = z_est_0(s);   % Plug in initial guessed states as first column
-    z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors{i});
-    z_est_selected_plot(i) = plot(0,z_est_selected(1,1),'DisplayName',sprintf('State %d est.', s),'Color',colors{i},'LineStyle','--');
-end
-
 % Plot a selection of true and guessed initial states of the process
+subplot(1,2,2)
+z_selected_plot(1) = plot(0,z_selected(1,1),'DisplayName','$M$','Color','b');
+hold on
+z_selected_plot(2) = plot(0,z_selected(2,1),'DisplayName','$\beta$','Color','r');
+z_selected_plot(3) = plot(0,z_selected(3,1),'DisplayName','$x_s$','Color','g');
+z_selected_plot(4) = plot(0,z_selected(4,1),'DisplayName','$y_s$','Color','k');
+z_est_selected_plot(1) = plot(0,z_est_selected(1,1),'DisplayName','$\hat{M}$','Color','b','LineStyle','--');
+z_est_selected_plot(2) = plot(0,z_est_selected(2,1),'DisplayName','$\hat{\beta}$','Color','r','LineStyle','--');
+z_est_selected_plot(3) = plot(0,z_est_selected(3,1),'DisplayName','$\hat{x_s}$','Color','g','LineStyle','--');
+z_est_selected_plot(4) = plot(0,z_est_selected(4,1),'DisplayName','$\hat{y_s}$','Color','k','LineStyle','--');
 xlabel('Time [s]')
 legend('Interpreter','latex','Location','west')
 
@@ -238,16 +237,14 @@ for k=2:K+1
     % Update robot positions
     for m = 1:M
         % Update robot positions
-        %x(m,k) = x(m,k-1) + normrnd(0, 1);
-        x(2*m-1,k) = z(5,k) + normrnd(0, 2);
-        x(2*m,k) = z(7,k) + normrnd(0, 2);
+        x(:,k) = x(:,k-1) + 0.1;
         % TODO (right now we cheated using MPC output)
     end
     %x(:,k) = A_r*x(:,k) + B_r*u_opt;
 
     % Take measurements
-    r = mvnrnd(mu_r',R)';
-    y(:,k) = h(z(:,k), x(:,k)) + r;
+    r = mvnrnd(mu_r,R);
+    y(:,k) = h(z(:,k), x(:,k));
     
     % Run Kalman filter iteration
     [z_est(:,k), P(:,:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k), Q, y(:,k), R, h, H, x(:,k));
@@ -265,14 +262,16 @@ for k=2:K+1
     end
     
     %update state and estimate plot
-    for i = 1:length(selec)
-        s = selec(i);
-        z_selected(i,k) = z(s,k);
-        z_est_selected(i,k) = z_est(s,k);
+    z_selected(:,k) = [z(1,k); z(3,k); z(5,k); z(7,k)];
+    z_est_selected(:,k) = [z_est(1,k); z_est(3,k); z_est(5,k); z_est(7,k)];
+    subplot(1,2,2)
+    for i=1:size(z_selected,1)
         set(z_selected_plot(i), 'XData', t_vec(1:k),'YData', z_selected(i,1:k))
         set(z_est_selected_plot(i), 'XData', t_vec(1:k), 'YData', z_est_selected(i,1:k))
     end
-    drawnow limitrate    
+    drawnow
+    pause(dt/2)
+    
 
     % set(z_est_selected_plot(2), 'XData', t_vec(1:k), 'YData', z_est(3,1:k)) % Beta
     % set(z_est_selected_plot(3), 'XData', t_vec(1:k), 'YData', z_est(5,1:k)) % X position

@@ -179,18 +179,18 @@ for k = 1:Hp
         opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
     end
 
-    % Collision avoidance
-    for i = 1:N
-        for j = i+1:N
-            xi = Za((i-1)*n_a + 1, k+1);
-            yi = Za((i-1)*n_a + 2, k+1);
-            xj = Za((j-1)*n_a + 1, k+1);
-            yj = Za((j-1)*n_a + 2, k+1);
-
-            dist_squared = (xi - xj)^2 + (yi - yj)^2;
-            opti.subject_to(dist_squared >= dmin^2);
-        end
-    end
+    % % Collision avoidance
+    % for i = 1:N
+    %     for j = i+1:N
+    %         xi = Za((i-1)*n_a + 1, k+1);
+    %         yi = Za((i-1)*n_a + 2, k+1);
+    %         xj = Za((j-1)*n_a + 1, k+1);
+    %         yj = Za((j-1)*n_a + 2, k+1);
+    % 
+    %         dist_squared = (xi - xj)^2 + (yi - yj)^2;
+    %         opti.subject_to(dist_squared >= dmin^2);
+    %     end
+    % end
 end
 
 % Outputs
