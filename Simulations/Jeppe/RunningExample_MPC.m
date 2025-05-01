@@ -33,6 +33,7 @@ xs_dot_ref = 0;
 ys_ref = 10;
 ys_dot_ref = 0;
 z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_dot_ref]; % Initial true state vector
+N = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
 M_0 = 0;
@@ -46,7 +47,7 @@ ys_dot_0 = 0;
 z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % Initial guessed state vector
 
 % Initial error covariance matrix
-P_0 = zeros(length(z_0));
+P_0 = zeros(N);
 P_0(1,1) = (M_ref - M_0)^2;
 P_0(3,3) = (beta_ref - beta_0)^2;
 P_0(5,5) = (xs_ref - xs_0)^2;
@@ -60,24 +61,6 @@ for m = 1:M
     x_1(2*m) = ys_ref;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
-
-%% Create Required Vectors and Matrices
-% MPC
-x = zeros(2*M,K+1);         % Robot positions
-
-% KALMAN FILTER
-N = length(z_0);            % Number of states in process state vector
-z = zeros(N,K+1);           % True process states (N)
-z_est = zeros(N,K+1);       % Estimated process states by Kalman filter
-P = zeros(N,N,K+1);         % Error covariance matrix
-y = zeros(M,K+1);           % Measurements of process
-
-% Put initial conditions into vectors
-z(:,1) = z_0;
-z_est(:,1) = z_est_0;
-x(:,1) = x_1;
-x(:,2) = x_1;
-P(:,:,1) = P_0;
 
 %% Dynamic Parameter Model
 tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
@@ -169,6 +152,24 @@ D_ri = 0;
 
 A_r = kron(eye(M), A_ri);
 B_r = kron(eye(M), B_ri);
+
+%% Create Required Vectors and Matrices
+% MPC
+x = zeros(2*M,K+1);         % Robot positions
+
+% KALMAN FILTER
+N = length(z_0);            
+z = zeros(N,K+1);           % True process states (N)
+z_est = zeros(N,K+1);       % Estimated process states by Kalman filter
+P = zeros(N,N,K+1);         % Error covariance matrix
+y = zeros(M,K+1);           % Measurements of process
+
+% Put initial conditions into vectors
+z(:,1) = z_0;
+z_est(:,1) = z_est_0;
+x(:,1) = x_1;
+x(:,2) = x_1;
+P(:,:,1) = P_0;
 
 %% Storage and plotting for measurements and kalman filter
 %measurements = zeros(M,K+1);
