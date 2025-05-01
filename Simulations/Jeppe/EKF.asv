@@ -1,0 +1,61 @@
+function [x,P] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, h_m, pos_rob)
+    % INPUTS
+    % x_prev  : States from k-1
+    % P_prev  : Error covariance matrix from k-1
+    % A_prev  : System matrix for process dynamics from k-1
+    % B_prev  : Input matrix for process dynamics from k-1
+    % u_prev  : Input vector from from k-1
+    % Q_prev  : State noise covariance matrix from k-1
+    % y       : Measurements from k-1
+    % R       : Measurement noise covariance matrix from k-1
+    % h       : Function to compute the measurements (h vector in EKF)
+    % H       : Function to comp. Jacobian of h with states and robot pos.
+    % pos_rob : State vector for robots (robot positions)
+    % 
+    % OUTPUTS
+    % x  : State vector for time k
+    % P  : Error covariance matrix for time k
+    
+    % PREDICTION STEP
+    x_hat = A_prev*x_prev + B_prev*u_prev;
+    P_hat = A_prev*P_prev*A_prev' + Q_prev;
+
+    % PREPROCESSING
+    M = length(y); N = length(x_prev);
+    H_x = H(x_hat,pos_rob,M)
+    % H_m1 = @(z, px, py) h_m(z, px, py)/z(1);
+    % H_m3 = @(z, px, py) h_m(z, px, py)*(1/z(3) - ((px - z(5))^2 + (py - z(7))^2));
+    % H_m5 = @(z, px, py) h_m(z, px, py)*(-2*z(3)*(z(5) - px));
+    % H_m7 = @(z, px, py) h_m(z, px, py)*(-2*z(3)*(z(7) - py));
+    % H_m = @(z, px, py) [H_m1(z, px, py), 0, H_m3(z, px, py), 0, H_m5(z, px, py), 0, H_m7(z, px, py), 0];
+    % H_x = zeros(M,N);
+    % for m = 1:M
+    %     H_x(m,:) = H_m(x_hat, pos_rob(2*m-1), pos_rob(2*m));
+    % end
+    % H_x
+    
+
+    % h_m = @(states,px,py) (states(1)*states(3)/pi)*exp(-states(3)*((px-states(5)).^2 + (py-states(7)).^2));
+    % M = length(y); N = length(x_prev);
+    % H_x1 = zeros(M,N);
+    % for m=1:M
+    %     x_pos = pos_rob(2*m-1);
+    %     y_pos = pos_rob(2*m);
+    %     y = h_m(x_hat, x_pos, y_pos);
+    %     H_x1(m,1) = y/x_hat(1);
+    %     H_x1(m,3) = -y*((x_pos-x_hat(5))^2 + (y_pos-x_hat(7))^2) + y/x_hat(3);
+    %     H_x1(m,5) = -2*y*x_hat(3)*(x_hat(5)-x_pos);
+    %     H_x1(m,7) = -2*y*x_hat(3)*(x_hat(7)-y_pos);
+    % end
+    % H_x1
+
+
+    % UPDATE STEP
+    v = y - h(x_hat, pos_rob,M);
+    K = P_hat*H_x'*inv(H_x*P_hat*H_x' + R);
+    K = P_hat*H_x'*inv(H_x*P_hat*H_x' + R);
+    x = x_hat + K*v;
+    P = P_hat - K*H_x*P_hat;
+    %P = (eye(length(x)) - K*H_x)*P_hat*(eye(length(x)) - K*H_x)' + K*R*K'
+end
+

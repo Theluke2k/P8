@@ -1,4 +1,4 @@
-function [x,P] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, H, pos_rob)
+function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, H, pos_rob)
     % INPUTS
     % x_prev  : States from k-1
     % P_prev  : Error covariance matrix from k-1
@@ -15,15 +15,21 @@ function [x,P] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, H, pos_
     % OUTPUTS
     % x  : State vector for time k
     % P  : Error covariance matrix for time k
-
+    
     % PREDICTION STEP
     x_hat = A_prev*x_prev + B_prev*u_prev;
     P_hat = A_prev*P_prev*A_prev' + Q_prev;
 
+    % PREPROCESSING
+    M = length(y);
+    H_x = H(x_hat,pos_rob,M)
+
     % UPDATE STEP
-    v = y - h(x_hat, pos_rob);
-    K = P_hat*H(x_hat,pos_rob)'*inv(H(x_hat,pos_rob)*P_hat*H(x_hat,pos_rob)' + R);
+    v = y - h(x_hat, pos_rob,M);
+    %K = P_hat*H_x'*inv(H_x*P_hat*H_x' + R)     % Numerically unstable
+    K = (P_hat*H_x') / (H_x*P_hat*H_x' + R);    % More accurate comp.
     x = x_hat + K*v;
-    P = P_hat - K*H(x_hat,pos_rob)*P_hat;
+    P = P_hat - K*H_x*P_hat
+    %P = (eye(length(x)) - K*H_x)*P_hat*(eye(length(x)) - K*H_x)' + K*R*K'    
 end
 
