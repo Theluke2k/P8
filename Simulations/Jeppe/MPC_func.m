@@ -39,85 +39,37 @@ H_KF = kf_init{9};          % Function handle to compute Jacobian matrix H
 
 % Insert initial conditions
 z_est(:,1) = kf_init{1};
-P(:,:,1) = kf_init{2}
-
-% KF Dynamic model
-tau_beta = 0.998;       %spread increase parameter (exponential decay of beta)
-
-% Inputs
-beta0 = 0; %steady-state value for beta
-u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
-u_M = 2; % Leakage rate offset
-u_KF = ones(2,Hp);
-u_KF(1,:) = u_KF(1,:)*u_M;
-u_KF(2,:) = u_KF(2,:)*u_beta;
-
-A_KF = [1 dt 0 0 0 0 0 0;
-     0 1 0 0 0 0 0 0;
-     0 0 tau_beta dt 0 0 0 0;
-     0 0 0 1 0 0 0 0;
-     0 0 0 0 1 dt 0 0;
-     0 0 0 0 0 1 0 0;
-     0 0 0 0 0 0 1 dt;
-     0 0 0 0 0 0 0 1];
-
-B_KF = zeros(8,2);
-B_KF(1,1) = dt; 
-B_KF(3,2) = dt;
-
-% Process noise
-G = [0.5*dt^2 0 0 0;
-    dt 0 0 0;
-    0 0.5*dt^2 0 0;
-    0 dt 0 0;
-    0 0 0.5*dt^2 0;
-    0 0 dt 0;
-    0 0 0 0.5*dt^2;
-    0 0 0 dt];
-sigma_M = 0.2; sigma_beta = 0.0001; sigma_x = 0.01; sigma_y = 0.01;
-sigma = [sigma_M sigma_beta sigma_x sigma_y]';
-mu_w = zeros(length(sigma),1);
-Q = G*diag([sigma_M sigma_beta sigma_x sigma_y])*G';
-
-% Measurement model - h(z,x,y) = (M*beta/pi)*exp(-beta*((x-xs).^2 + (y-ys).^2))
-h = @(states,x,y) (states(1)*states(3)/pi)*exp(-states(3)*((x-states(5)).^2 + (y-states(7)).^2));
-
-% Measurement noise
-sigma_measurement = 0.1;
-R_KF = sigma_measurement*eye(M); % measurement noise covariance
+P(:,:,1) = kf_init{2};
 
 %% Robot model
-
-% Robot model (integrator)
+% Integrator
 A = eye(2); % z = [x;y]
 B = Ts*eye(2); % u = [vx;vy]
-C = eye(2);
-D = 0;
+N_u = length(u_KF(:,1));
 n = size(A,1);
 l = size(B,2);
-m = size(C,1);
 
 % Reformulation to Delta u
-A_a = [A,B; zeros(n,n),eye(n)]; % X(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
-B_a = [B; eye(l)]; % Du(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
-C_a = [C, zeros(n,m)]; % za(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
-D_a = 0; % DU(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
+A_a = [A,B; zeros(N_u,N_u),eye(n)]; % X(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
+B_a = [B; eye(N_u)];                % Du(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
 n_a = size(A_a,1);
 l_a = size(B_a,2);
-m_a = size(C_a,1);
+
+% Construct full robot dynamics matrix
+for m = 1:M
+    % TODO
+end
 
 % Expanded to include all M robots (DEFINED INCORRECTLY -> Assumes [x1;y1;vx1;vy1;x2;y2;...] should assume [x1;y1;x2;y2;...;vx1;vy1;...])
 A_aN = kron(eye(M), A_a);
 B_aN = kron(eye(M), B_a);
-C_aN = kron(eye(M), C_a);
-D_aN = 0;
 
 %% MPC object
 % Setup opti
 opti = Opti();
 
 % Decision variables (to be optimized over)
-DU = opti.variable(M*l_a,Hu);
+du = opti.variable(M*l_a,Hu);
 Za = opti.variable(M*n_a,Hp+1);
 
 P_KF_est = opti.variable(8*Hp,8);
@@ -230,8 +182,10 @@ opti.solver('ipopt', solver_opts);
 % Initialization
 Z0_val = rob_init(:,1); % Initial robot states
 Uprev_val = rob_init(:,2); % Previous control input
-Z0_KF_val = kf_init(:,1); % Initial prediction for kalman filter
-P0_KF_val = kf_init(:,2:end); % Initial error covariance
+%Z0_KF_val = kf_init(:,1); % Initial prediction for kalman filter
+%P0_KF_val = kf_init(:,2:end); % Initial error covariance
+Z0_KF_val = z_est(:,1);
+P0_KF_val = P(:,:,1);
 
 opti.set_value(Z0, Z0_val);
 opti.set_value(Uprev, Uprev_val);
