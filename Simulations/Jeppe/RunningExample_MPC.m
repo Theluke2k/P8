@@ -36,7 +36,7 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 N = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 150;
+M_0 = 100;
 M_dot_0 = 0;
 beta_0 = 0.5;
 beta_dot_0 = 0;
@@ -100,8 +100,8 @@ G = [0.5*dt^2 0 0 0;
     0 0 0 0.5*dt^2;
     0 0 0 dt];
 sigma_M = 1; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
-sigma = [sigma_M sigma_beta sigma_x sigma_y]';
-mu_w = zeros(length(sigma),1);
+v = [sigma_M sigma_beta sigma_x sigma_y]';
+mu_w = zeros(length(v),1);
 Q = G*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G'; % This is the process noise covariance matrix
 
 % Measurement noise
@@ -242,7 +242,7 @@ z_hat(:,1) = z_est(:,1);
 for k=2:K+1
     clc
     % Update true process
-    w = G*normrnd(mu_w,sigma);
+    w = G*normrnd(mu_w,v);
     z(:,k) = A*z(:,k-1) + B*u(:,k-1) + w;
     
     % Update robot positions
@@ -274,8 +274,16 @@ for k=2:K+1
     % Run Kalman filter iteration
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, h, H, x(:,k));
    
+    % Package all Kalman filter information
+    KF_params = {z_est(:,k), P(:,:,k), A, B, u(:,k:k+Hp), Q, R, h, H};
+
     % Compute optimal stuff
-        
+    kf_init = [z_est(:,k), P(:,:,k)];
+    rob_init = [x(:,k), u_opt];
+    [X_opt, U_opt, P_trace] = MPC_func(rob_init, KF_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 3);
+    u_opt = U_opt(:,2);
+    x(:,k+1) = X_opt(:,2);
+
     % Update process plot
     subplot(1,2,1)
     z_values = h_m(z(:,k),x_axis,y_axis);

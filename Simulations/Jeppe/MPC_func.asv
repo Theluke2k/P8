@@ -23,23 +23,23 @@ dt = sim_params(2); % Simulation sampling time
 
 % MISC
 M = n_robots; % Number of robots
-N = length(kf_init{1});
+N = length(kf_init(1));
 
 %% KALMAN FILTER
 % Define parameters to be used
 z_est = zeros(N,Hp+1);      % Estimated process states
 P = zeros(N,N,Hp+1);        % KF error covariance matrix
-A_KF = kf_init{3};          % Process system matrix
-B_KF = kf_init{4};          % Process input matrix
-u_KF = kf_init{5};          % Process input
-Q_KF = kf_init{6};          % Process noise covariance matrix
-R_KF = kf_init{7};          % Measurement noise covariance matrix
-h_KF = kf_init{8};          % Function handle to compute vector h
-H_KF = kf_init{9};          % Function handle to compute Jacobian matrix H
+A_KF = kf_init(3);          % Process system matrix
+B_KF = kf_init(4);          % Process input matrix
+u_KF = kf_init(5);          % Process input
+Q_KF = kf_init(6);          % Process noise covariance matrix
+R_KF = kf_init(7);          % Measurement noise covariance matrix
+h_KF = kf_init(8);          % Function handle to compute vector h
+H_KF = kf_int
 
 % Insert initial conditions
-z_est(:,1) = kf_init{1};
-P(:,:,1) = kf_init{2}
+z_est(:,1) = kf_init(1);
+P(:,:,1) = kf_init(2)
 
 % KF Dynamic model
 tau_beta = 0.998;       %spread increase parameter (exponential decay of beta)
