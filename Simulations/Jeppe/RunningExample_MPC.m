@@ -2,7 +2,7 @@
 clc; clear; close all;
 %% Adjustable Parameters
 % General simulation parameters
-M = 3;                  % Number of robots
+M = 8;                  % Number of robots
 dt = 0.1;               % Sampling period [s]
 sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
@@ -41,9 +41,9 @@ M_0 = 100;
 M_dot_0 = 0;
 beta_0 = 0.05;
 beta_dot_0 = 0;
-xs_0 = 15;
+xs_0 = 10;
 xs_dot_0 = 0;
-ys_0 = 25;
+ys_0 = 10;
 ys_dot_0 = 0;
 z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % Initial guessed state vector
 
@@ -125,41 +125,42 @@ sigma_measurement = 0.001;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
 
-% Measurement model - h_i(z,x,y) = (M*beta/pi)*exp(-beta*((x-xs).^2 + (y-ys).^2))
-h_m = @(states,px,py) (states(1)*states(3)/pi)*exp(-states(3)*((px-states(5)).^2 + (py-states(7)).^2));
-h = @(z,x,M) arrayfun(@(m) h_m(z, x(2*m-1), x(2*m)), (1:M)');
-% TESTING
-% h(z_0,x_1)
-% h = zeros(M,1);
-% for m = 1:M
-%     h(m) = h_m(z_0, x_1(2*m-1), x_1(2*m));
-% end
-% h
+% % Measurement model - h_i(z,x,y) = (M*beta/pi)*exp(-beta*((x-xs).^2 + (y-ys).^2))
+% h_p = @(states,px,py) (states(1)*states(3)/pi)*exp(-states(3)*((px-states(5)).^2 + (py-states(7)).^2));
+% h_vec = @(z,x,M) arrayfun(@(m) h_p(z, x(2*m-1), x(2*m)), (1:M)');
+% % TESTING
+% % h(z_0,x_1)
+% % h = zeros(M,1);
+% % for m = 1:M
+% %     h(m) = h_p(z_0, x_1(2*m-1), x_1(2*m));
+% % end
+% % h
+% 
+% % Functions used in computing the Jacobian
+% H_m1 = @(z, px, py) h_p(z, px, py)/z(1);
+% H_m3 = @(z, px, py) h_p(z, px, py)*(1/z(3) - ((px - z(5))^2 + (py - z(7))^2));
+% H_m5 = @(z, px, py) h_p(z, px, py)*(-2*z(3)*(z(5) - px));
+% H_m7 = @(z, px, py) h_p(z, px, py)*(-2*z(3)*(z(7) - py));
+% H_m = @(z, px, py) [H_m1(z, px, py), 0, H_m3(z, px, py), 0, H_m5(z, px, py), 0, H_m7(z, px, py), 0];
+% 
+% % Dynamically construct a function that computes the Jacobian for a
+% % specific state and robot position
+% H = @(z, x, M) cell2mat(...
+%             arrayfun(...
+%             @(m) H_m(z, x(2*m-1), x(2*m)), (1:M)', 'UniformOutput', false));
 
-% Functions used in computing the Jacobian
-H_m1 = @(z, px, py) h_m(z, px, py)/z(1);
-H_m3 = @(z, px, py) h_m(z, px, py)*(1/z(3) - ((px - z(5))^2 + (py - z(7))^2));
-H_m5 = @(z, px, py) h_m(z, px, py)*(-2*z(3)*(z(5) - px));
-H_m7 = @(z, px, py) h_m(z, px, py)*(-2*z(3)*(z(7) - py));
-H_m = @(z, px, py) [H_m1(z, px, py), 0, H_m3(z, px, py), 0, H_m5(z, px, py), 0, H_m7(z, px, py), 0];
-
-% Dynamically construct a function that computes the Jacobian for a
-% specific state and robot position
-H = @(z, x, M) cell2mat(...
-            arrayfun(...
-            @(m) H_m(z, x(2*m-1), x(2*m)), (1:M)', 'UniformOutput', false));
-
-%TESTING
-%H(z_0,x_1)
+% %TESTING
+% H(z_0,x_1,M)
+% get_H_jaco(z_0,x_1,M)
 % H = zeros(M,Nx_p);
 % for m=1:M
 %     x_pos = x_1(2*m-1);
 %     y_pos = x_1(2*m);
-%     y = h(z_0, x_pos, y_pos);
-%     H(m,1) = y/z(1);
-%     H(m,3) = -y*((x_pos-z(5))^2 + (y_pos-z(7))^2) + y/z(3);
-%     H(m,5) = -2*y*z(3)*(z(5)-x_pos);
-%     H(m,7) = -2*y*z(3)*(z(7)-y_pos);
+%     y = h_p(z_0, x_pos, y_pos);
+%     H(m,1) = y/z_0(1);
+%     H(m,3) = -y*((x_pos-z_0(5))^2 + (y_pos-z_0(7))^2) + y/z_0(3);
+%     H(m,5) = -2*y*z_0(3)*(z_0(5)-x_pos);
+%     H(m,7) = -2*y*z_0(3)*(z_0(7)-y_pos);
 % end
 % H
 
@@ -212,7 +213,7 @@ P(:,:,1) = P_0;
 % Initializations
 x_axis = linspace(xmin,xmax,50);    % Process x-axis
 y_axis = linspace(ymin,ymax,50)';   % Process y-axis
-z_values = h_m(z_0,x_axis,y_axis);    % Process values in defined area
+z_values = get_h(z_0,x_axis,y_axis);    % Process values in defined area
 t_vec = (0:K) * dt;               % Time vector for plotting
 colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
 
@@ -283,35 +284,35 @@ for k=2:K+1
     for m = 1:M
         % Update robot positions
         % x(m,k) = z(m,k-1) + normrnd(0, 1);
-        x(2*m-1,k) = z(5,k-1) + normrnd(0, 2);
-        x(2*m,k) = z(7,k-1) + normrnd(0, 2);
+        % x(2*m-1,k) = z(5,k-1) + normrnd(0, 2);
+        % x(2*m,k) = z(7,k-1) + normrnd(0, 2);
         %Randomly update speed/turn rate
-        % if rand() < 0.5
-        %     robot_v(m) = max_speed * rand();
-        %     robot_omega(m) = (rand()-0.5)*2*max_omega;
-        % end
-        % 
-        % % Update orientation
-        % robot_theta(m) = mod(robot_theta(m) + robot_omega(m)*dt, 2*pi);
-        % 
-        % % Proposed new position
-        % x(2*m-1,k) = x(2*m-1,k-1) + robot_v(m)*cos(robot_theta(m))*dt;
-        % x(2*m,k) = x(2*m,k-1) + robot_v(m)*sin(robot_theta(m))*dt;
+        if rand() < 0.5
+            robot_v(m) = max_speed * rand();
+            robot_omega(m) = (rand()-0.5)*2*max_omega;
+        end
+
+        % Update orientation
+        robot_theta(m) = mod(robot_theta(m) + robot_omega(m)*dt, 2*pi);
+
+        % Proposed new position
+        x(2*m-1,k) = x(2*m-1,k-1) + robot_v(m)*cos(robot_theta(m))*dt;
+        x(2*m,k) = x(2*m,k-1) + robot_v(m)*sin(robot_theta(m))*dt;
         % TODO (right now we cheated using MPC output)
     end
     %x(:,k) = A_r*x(:,k) + B_r*u_opt;
 
     % Take measurements
     r = mvnrnd(mu_r',R)';
-    y(:,k) = h(z(:,k), x(:,k),M) + r;
+    y(:,k) = get_h_vec(z(:,k), x(:,k), M) + r;
     
     % Run Kalman filter iteration
-    [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, h, H, x(:,k));
+    [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, x(:,k));
    
     % Package all Kalman filter information
     u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
     u_mpc(2,:) = u_mpc(2,:)*(dt/Ts);    % Scale input to match MPC sampling period
-    KF_params = {z_est(:,k), P(:,:,k), A_MPC, B_MPC, u_mpc, Q_MPC, R, h, H, error_cv_selec};
+    KF_params = {z_est(:,k), P(:,:,k), A_MPC, B_MPC, u_mpc, Q_MPC, R, error_cv_selec};
 
     % Package all robot information
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
@@ -319,14 +320,13 @@ for k=2:K+1
     % Compute optimal stuff
     %kf_init = [z_est(:,k), P(:,:,k)];
     %rob_init = [x(:,k), u_opt];
-    %rob_init = {x(:,k), u_opt};
     [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 3);
     u_opt = U_opt(:,2);
     x(:,k+1) = X_opt(:,2);
 
     % Update process plot
     subplot(1,2,1)
-    z_values = h_m(z(:,k),x_axis,y_axis);
+    z_values = get_h(z(:,k),x_axis,y_axis);
     set(process_plot(1), 'XData', x_axis, 'YData', y_axis, 'ZData', z_values)
     
     % Update robot positions

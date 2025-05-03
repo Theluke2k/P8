@@ -1,4 +1,4 @@
-function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, H, pos_rob)
+function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, pos_rob)
     % INPUTS
     % x_prev  : States from k-1
     % P_prev  : Error covariance matrix from k-1
@@ -22,10 +22,10 @@ function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, h, 
 
     % PREPROCESSING
     M = length(y);
-    H_x = H(x_hat,pos_rob,M);
+    H_x = get_H_jaco(x_hat,pos_rob,M);
 
     % UPDATE STEP
-    v = y - h(x_hat, pos_rob,M);
+    v = y - get_h_vec(x_hat, pos_rob,M);
     %K = P_hat*H_x'*inv(H_x*P_hat*H_x' + R)     % Numerically unstable
     K = (P_hat*H_x') / (H_x*P_hat*H_x' + R);    % More accurate comp.
     x = x_hat + K*v;

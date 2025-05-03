@@ -31,9 +31,7 @@ B_p = kf_init{4};     % Process input matrix with MPC dt
 u_p = kf_init{5};          % Process input
 Q_p = kf_init{6};          % Process noise covariance matrix
 R_p = kf_init{7};          % Measurement noise covariance matrix
-h_p = kf_init{8};          % Function handle to compute vector h
-H_p = kf_init{9};          % Function handle to compute Jacobian matrix H
-error_cv_selec = kf_init{10};% Selection of diagonal elements to have in cost function
+error_cv_selec = kf_init{8};% Selection of diagonal elements to have in cost function
 
 % Useful numbers
 Nx_p = size(A_p,1);       % Number of states in process model
@@ -66,21 +64,25 @@ B_rd = [B_r; eye(M*Nu_r)];
 
 % Construct full tuning matrices
 Q = kron(eye(Nx_p), Q_single);
-R = kron(eye(Nu_p), R_single);
+R = kron(eye(M), R_single);
+
+x0 = rob_init{1};
 
 %% MPC object
 % Setup opti
 opti = Opti();
 
 % Decision variables (to be optimized over)
-du = opti.variable(M*Nu, Hu);   % Delta u (change in robot control input)
+du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
 
 % States and varialbes (NOT to be optimized over)
-p = opti.variable(Nx_p,Hp+1);  % KF error covariance diagonal elements
-x = opti.variable(M*Nx,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints    
+p = opti.parameter(Nx_p,Hp+1);  % KF error covariance diagonal elements
+x = opti.parameter(M*Nx_r,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints  
 
 % Enforce initial conditions on variables
-opti.subject_to(x(:,1) == rob_init{1});
+%x(:,1) = x0;
+
+%opti.subject_to(x(:,1) == rob_init{1});
 
 % % Decision variables (to be optimized over)
 % DU = opti.variable(M*l_a,Hu);
@@ -105,13 +107,16 @@ opti.subject_to(x(:,1) == rob_init{1});
 %% Create Cost Function
 % Control input
 cost = 0;
-for k = 1:Hp
-    cost = cost + du(:,k)'*Q*du(:,k); % Assuming R = I
+for i = 1:Hu
+    cost = cost + du(:,i)'*R*du(:,i);
 end
 
 % Kalman Filter
 dummy1 = zeros(Nx_p);
-for k = 1:Hp
+[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
+
+
+for i = 1:Hp
     
 end
 
