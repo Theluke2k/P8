@@ -23,77 +23,133 @@ dt = sim_params(2); % Simulation sampling time
 
 % MISC
 M = n_robots; % Number of robots
-N = length(kf_init{1});
 
 %% KALMAN FILTER
 % Define parameters to be used
-z_est = zeros(N,Hp+1);      % Estimated process states
-P = zeros(N,N,Hp+1);        % KF error covariance matrix
-A_KF = kf_init{3};          % Process system matrix
-B_KF = kf_init{4};          % Process input matrix
-u_KF = kf_init{5};          % Process input
-Q_KF = kf_init{6};          % Process noise covariance matrix
-R_KF = kf_init{7};          % Measurement noise covariance matrix
-h_KF = kf_init{8};          % Function handle to compute vector h
-H_KF = kf_init{9};          % Function handle to compute Jacobian matrix H
+A_p = kf_init{3};     % Process system matrix with MPC dt
+B_p = kf_init{4};     % Process input matrix with MPC dt
+u_p = kf_init{5};          % Process input
+Q_p = kf_init{6};          % Process noise covariance matrix
+R_p = kf_init{7};          % Measurement noise covariance matrix
+h_p = kf_init{8};          % Function handle to compute vector h
+H_p = kf_init{9};          % Function handle to compute Jacobian matrix H
+error_cv_selec = kf_init{10};% Selection of diagonal elements to have in cost function
 
-% Insert initial conditions
-z_est(:,1) = kf_init{1};
-P(:,:,1) = kf_init{2};
+% Useful numbers
+Nx_p = size(A_p,1);       % Number of states in process model
+Nu_p = size(B_p,2);       % Number of inputs in process model
 
-%% Robot model
+% Define initial conditions
+z_est = zeros(Nx_p,Hp+1);      % Estimated process states
+P = zeros(Nx_p,Nx_p,Hp+1);        % KF error covariance matrix
+z_est(:,1) = kf_init{1};    % KF state from k-1
+P(:,:,1) = kf_init{2};      % KF error covariance matrix fom k-1
+
+%% Robot model and Tuning
+% Tuning for a single robot
+Q_single = [1 0;
+     0 1];
+R_single = [1 0;
+     0 1];
+
+% Import robot dynamics from parameters
+A_r = rob_init{2};    % Robot system matrix
+B_r = rob_init{3};    % Robot input matrix
+
+% Save useful numbers
+Nx_r = size(A_r,1)/M;   % Number of states for a sigle robot
+Nu_r = size(B_r,2)/M;   % Number of inputs for a single robot
+
+% Reformulate to delta u
+A_rd = [A_r,B_r; zeros(M*Nu_r, M*Nx_r), eye(M*Nu_r, M*Nu_r)];
+B_rd = [B_r; eye(M*Nu_r)];
+
+% Construct full tuning matrices
+Q = kron(eye(Nx_p), Q_single);
+R = kron(eye(Nu_p), R_single);
+
+% Import robot dynamics
+
+
 % Integrator
-A = eye(2); % z = [x;y]
-B = Ts*eye(2); % u = [vx;vy]
-N_u = length(u_KF(:,1));
-n = size(A,1);
-l = size(B,2);
+A_single = eye(2); % z = [x;y]
+B_single = Ts*eye(2); % u = [vx;vy]
 
-% Reformulation to Delta u
-A_a = [A,B; zeros(N_u,N_u),eye(n)]; % X(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
-B_a = [B; eye(N_u)];                % Du(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
-n_a = size(A_a,1);
-l_a = size(B_a,2);
+% n = size(A,1);
+% l = size(B,2);
 
 % Construct full robot dynamics matrix
-for m = 1:M
-    % TODO
-end
+A_r = kron(eye(M), A_single);
+B_r = kron(eye(M), B_single);
 
-% Expanded to include all M robots (DEFINED INCORRECTLY -> Assumes [x1;y1;vx1;vy1;x2;y2;...] should assume [x1;y1;x2;y2;...;vx1;vy1;...])
-A_aN = kron(eye(M), A_a);
-B_aN = kron(eye(M), B_a);
+% Construct full tuning matrices
+Q = kron(eye(M), Q_single);
+R = kron(eye(Nu), R_single);
+
+% Reformulate to delta u
+A_rd = [A_r,B_r; zeros(M*Nu, M*Nx), eye(M*Nu, M*Nu)];
+B_rd = [B_r; eye(M*Nu)];
+
+
+% % Reformulation to Delta u
+% A_a = [A,B; zeros(Nu,Nu),eye(n)]; % X(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
+% B_a = [B; eye(Nu)];                % Du(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
+% n_a = size(A_a,1);
+% l_a = size(B_a,2);
+% 
+% % Expanded to include all M robots (DEFINED INCORRECTLY -> Assumes [x1;y1;vx1;vy1;x2;y2;...] should assume [x1;y1;x2;y2;...;vx1;vy1;...])
+% A_aN = kron(eye(M), A_a);
+% B_aN = kron(eye(M), B_a);
 
 %% MPC object
 % Setup opti
 opti = Opti();
 
 % Decision variables (to be optimized over)
-du = opti.variable(M*l_a,Hu);
-Za = opti.variable(M*n_a,Hp+1);
+du = opti.variable(M*Nu, Hu);   % Delta u (change in robot control input)
 
-P_KF_est = opti.variable(8*Hp,8);
-P_KF_pred = opti.variable(8*(Hp+1),8);
+% States and varialbes (NOT to be optimized over)
+p = opti.variable(Nx_p,Hp+1);  % KF error covariance diagonal elements
+x = opti.variable(M*Nx,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints    
 
-Z_KF = opti.variable(8,Hp+1);
-h_KF = opti.variable(M,Hp);
 
-H_KF = opti.variable(M,8);
-K_KF = opti.variable(8,M);
+% Enforce initial conditions on variables
+%opti.subject_to(x(:,1) == );
 
-% Parameters (NOT to be optimized over)
-Z0 = opti.parameter(M*n,1);
-Uprev = opti.parameter(M*l,1);
-Z0_KF = opti.parameter(8,1);
-P0_KF = opti.parameter(8,8);
+% % Decision variables (to be optimized over)
+% DU = opti.variable(M*l_a,Hu);
+% Za = opti.variable(M*n_a,Hp+1);
+% 
+% P_KF_est = opti.variable(8*Hp,8);
+% P_KF_pred = opti.variable(8*(Hp+1),8);
+% 
+% Z_KF = opti.variable(8,Hp+1);
+% h_KF = opti.variable(M,Hp);
+% 
+% H_KF = opti.variable(M,8);
+% K_KF = opti.variable(8,M);
+% 
+% % Parameters (NOT to be optimized over)
+% Z0 = opti.parameter(M*n,1);
+% Uprev = opti.parameter(M*l,1);
+% Z0_KF = opti.parameter(8,1);
+% P0_KF = opti.parameter(8,8);
 
-% Cost function
+
+%% Create Cost Function
+% Control input
 cost = 0;
-for k = 1:Hu
-    cost = cost + DU(:,k)'*DU(:,k); % Assuming R = I
+for k = 1:Hp
+    cost = cost + du(:,k)'*Q*du(:,k); % Assuming R = I
 end
 
-% KF algorithm
+% Kalman Filter
+dummy1 = zeros(Nx_p);
+for k = 1:Hp
+    
+end
+
+
 cost_KF = 0;
 Z_KF(:,1) = Z0_KF;
 P_KF_pred(1:8,:) = P0_KF; % P(k|k-1)

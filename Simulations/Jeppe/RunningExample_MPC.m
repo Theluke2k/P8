@@ -2,13 +2,14 @@
 clc; clear; close all;
 %% Adjustable Parameters
 % General simulation parameters
-M = 4;                  % Number of robots
+M = 3;                  % Number of robots
 dt = 0.1;               % Sampling period [s]
 sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
-Ts = 1;                 % MPC sampling period
+Ts = 0.8;                 % MPC sampling period
 sim_params = [Ts, dt];
-selec = [5,7];            % Select states to plot
+state_plot_selec = [5,7];            % Select states to plot
+error_cv_selec = [1,3,5,7];
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
@@ -33,12 +34,12 @@ xs_dot_ref = 0;
 ys_ref = 25;
 ys_dot_ref = 0;
 z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_dot_ref]; % Initial true state vector
-N = length(z_0); % Number of states in process state vector
+Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
 M_0 = 100;
 M_dot_0 = 0;
-beta_0 = 0.5;
+beta_0 = 0.05;
 beta_dot_0 = 0;
 xs_0 = 15;
 xs_dot_0 = 0;
@@ -47,7 +48,7 @@ ys_dot_0 = 0;
 z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % Initial guessed state vector
 
 % Initial error covariance matrix
-P_0 = zeros(N);
+P_0 = zeros(Nx_p);
 P_0(1,1) = (M_ref - M_0)^2;
 P_0(3,3) = (beta_ref - beta_0)^2;
 P_0(5,5) = (xs_ref - xs_0)^2;
@@ -69,29 +70,42 @@ U_prev = zeros(2*M,1);           % (2*M values again)
 tau_beta = 0.999;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
+Nu_p = 2;
 beta0 = 0.05; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
 u_M = 10; % Leakage rate offset
-u = ones(2,K+1);
+u = ones(Nu_p,K+Hp+1);
 u(1,:) = u(1,:)*u_M;
 u(2,:) = u(2,:)*u_beta;
 
-% Process system matrix
-A = [1 dt 0 0 0 0 0 0;
-     0 1 0 0 0 0 0 0;
-     0 0 tau_beta dt 0 0 0 0;
-     0 0 0 1 0 0 0 0;
-     0 0 0 0 1 dt 0 0;
-     0 0 0 0 0 1 0 0;
-     0 0 0 0 0 0 1 dt;
-     0 0 0 0 0 0 0 1];
+% Process system matrix (depends on dt)
+A_func = @(dt) [1 dt 0 0 0 0 0 0;
+           0 1 0 0 0 0 0 0;
+           0 0 tau_beta dt 0 0 0 0;
+           0 0 0 1 0 0 0 0;
+           0 0 0 0 1 dt 0 0;
+           0 0 0 0 0 1 0 0;
+           0 0 0 0 0 0 1 dt;
+           0 0 0 0 0 0 0 1];
+B_func = @(dt) [dt 0;
+           0 0;
+           0 dt;
+           0 0;
+           0 0;
+           0 0;
+           0 0;
+           0 0];
+
+% Create system matrices with corresponding sampling periods
+A = A_func(dt);
+B = B_func(dt);
 
 % Process input matrix
-B = zeros(N,2);
-B(1,1) = dt; B(3,2) = dt;
+% B = zeros(Nx_p,2);
+% B(1,1) = dt; B(3,2) = dt;
 
 % Process noise (Q)
-G = [0.5*dt^2 0 0 0;
+G_func = @(dt) [0.5*dt^2 0 0 0;
     dt 0 0 0;
     0 0.5*dt^2 0 0;
     0 dt 0 0;
@@ -99,6 +113,8 @@ G = [0.5*dt^2 0 0 0;
     0 0 dt 0;
     0 0 0 0.5*dt^2;
     0 0 0 dt];
+% 
+G = G_func(dt);
 sigma_M = 1; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
@@ -135,7 +151,7 @@ H = @(z, x, M) cell2mat(...
 
 %TESTING
 %H(z_0,x_1)
-% H = zeros(M,N);
+% H = zeros(M,Nx_p);
 % for m=1:M
 %     x_pos = x_1(2*m-1);
 %     y_pos = x_1(2*m);
@@ -146,25 +162,43 @@ H = @(z, x, M) cell2mat(...
 %     H(m,7) = -2*y*z(3)*(z(7)-y_pos);
 % end
 % H
-%% Robot State Space Model
-% Robot model (integrator)
-A_ri = eye(2);       % z = [x;y]
-B_ri = dt*eye(2);    % u = [vx;vy]
-C_ri = eye(2);
-D_ri = 0;
 
-A_r = kron(eye(M), A_ri);
-B_r = kron(eye(M), B_ri);
+% Everyting recomputed for the MPC
+A_MPC = A_func(Ts);
+B_MPC = B_func(Ts);
+Q_MPC = G_func(Ts)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G_func(Ts)';
+
+%% Robot State Space Model
+% Integrator
+A_r_single_func = @(dt) [1 0;       % Function to compute robot system matrix from dt
+                         0 1];
+B_r_single_func = @(dt) [dt 0;      % Function to compute robot input matrix from dt
+                         0 dt];
+
+% Compute robot A_r and B_r (simulation and MPC are different)
+A_r_single = A_r_single_func(dt); % z = [x;y]
+B_r_single = B_r_single_func(dt); % u = [vx;vy]
+A_r_single_MPC = A_r_single_func(Ts);
+B_r_single_MPC = B_r_single_func(Ts);
+
+% Construct full robot dynamics matrix
+A_r = kron(eye(M), A_r_single);
+B_r = kron(eye(M), B_r_single);
+A_r_MPC = kron(eye(M), A_r_single_MPC);
+B_r_MPC = kron(eye(M), B_r_single_MPC);
+
+% Save number of states and inputs for robot model
+Nx_r = size(A_r_single,1);
+Nu_r = size(B_r_single,2);
 
 %% Create Required Vectors and Matrices
 % MPC
 x = zeros(2*M,K+1);         % Robot positions
 
-% KALMAN FILTER
-N = length(z_0);            
-z = zeros(N,K+1);           % True process states (N)
-z_est = zeros(N,K+1);       % Estimated process states by Kalman filter
-P = zeros(N,N,K+1);         % Error covariance matrix
+% KALMAN FILTER           
+z = zeros(Nx_p,K+1);           % True process states (Nx_p)
+z_est = zeros(Nx_p,K+1);       % Estimated process states by Kalman filter
+P = zeros(Nx_p,Nx_p,K+1);         % Error covariance matrix
 y = zeros(M,K+1);           % Measurements of process
 
 % Put initial conditions into vectors
@@ -204,14 +238,14 @@ for m = 1:M
 end
 
 % Plot selected states
-z_selected = zeros(length(selec),K+1);          % Vector for storage of selected true process states
-z_est_selected = zeros(length(selec),K+1);      % Vector for storage of selected estimated process states
+z_selected = zeros(length(state_plot_selec),K+1);          % Vector for storage of selected true process states
+z_est_selected = zeros(length(state_plot_selec),K+1);      % Vector for storage of selected estimated process states
 z_selected_plot = gobjects(size(z_selected,1),1);
 z_est_selected_plot = gobjects(size(z_selected,1),1);
 subplot(1,2,2)
 hold on
-for i = 1:length(selec)
-    s = selec(i);
+for i = 1:length(state_plot_selec)
+    s = state_plot_selec(i);
     z_selected(i,1) = z_0(s);   % Plug in initial states as first column
     z_est_selected(i,1) = z_est_0(s);   % Plug in initial guessed states as first column
     z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors{i});
@@ -236,7 +270,7 @@ max_speed = 0.5*2;        % Maximum robot speed
 max_omega = pi/2;       % Maximum angular velocity
 change_prob = 0.1;      % Probability of changing direction
 
-z_hat = zeros(N,K+1);
+z_hat = zeros(Nx_p,K+1);
 z_hat(:,1) = z_est(:,1);
 
 for k=2:K+1
@@ -248,10 +282,10 @@ for k=2:K+1
     % Update robot positions
     for m = 1:M
         % Update robot positions
-        %x(m,k) = z(m,k-1) + normrnd(0, 1);
-        x(2*m-1,k) = z_est(5,k-1) + normrnd(0, 2); % This method works very
-        x(2*m,k) = z_est(7,k-1) + normrnd(0, 2);
-        % Randomly update speed/turn rate
+        % x(m,k) = z(m,k-1) + normrnd(0, 1);
+        x(2*m-1,k) = z(5,k-1) + normrnd(0, 2);
+        x(2*m,k) = z(7,k-1) + normrnd(0, 2);
+        %Randomly update speed/turn rate
         % if rand() < 0.5
         %     robot_v(m) = max_speed * rand();
         %     robot_omega(m) = (rand()-0.5)*2*max_omega;
@@ -275,12 +309,18 @@ for k=2:K+1
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, h, H, x(:,k));
    
     % Package all Kalman filter information
-    KF_params = {z_est(:,k), P(:,:,k), A, B, u(:,k:k+Hp), Q, R, h, H};
+    u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
+    u_mpc(2,:) = u_mpc(2,:)*(dt/Ts);    % Scale input to match MPC sampling period
+    KF_params = {z_est(:,k), P(:,:,k), A_MPC, B_MPC, u_mpc, Q_MPC, R, h, H, error_cv_selec};
 
+    % Package all robot information
+    ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
+    
     % Compute optimal stuff
-    kf_init = [z_est(:,k), P(:,:,k)];
-    rob_init = [x(:,k), u_opt];
-    [X_opt, U_opt, P_trace] = MPC_func(rob_init, KF_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 3);
+    %kf_init = [z_est(:,k), P(:,:,k)];
+    %rob_init = [x(:,k), u_opt];
+    %rob_init = {x(:,k), u_opt};
+    [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 3);
     u_opt = U_opt(:,2);
     x(:,k+1) = X_opt(:,2);
 
@@ -291,12 +331,12 @@ for k=2:K+1
     
     % Update robot positions
     for m = 1:M
-    set(robot_quivers(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
+        set(robot_quivers(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
     end
     
     %update state and estimate plot
-    for i = 1:length(selec)
-        s = selec(i);
+    for i = 1:length(state_plot_selec)
+        s = state_plot_selec(i);
         z_selected(i,k) = z(s,k);
         z_est_selected(i,k) = z_est(s,k);
         set(z_selected_plot(i), 'XData', t_vec(1:k),'YData', z_selected(i,1:k))
