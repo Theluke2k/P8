@@ -68,39 +68,6 @@ B_rd = [B_r; eye(M*Nu_r)];
 Q = kron(eye(Nx_p), Q_single);
 R = kron(eye(Nu_p), R_single);
 
-% Import robot dynamics
-
-
-% Integrator
-A_single = eye(2); % z = [x;y]
-B_single = Ts*eye(2); % u = [vx;vy]
-
-% n = size(A,1);
-% l = size(B,2);
-
-% Construct full robot dynamics matrix
-A_r = kron(eye(M), A_single);
-B_r = kron(eye(M), B_single);
-
-% Construct full tuning matrices
-Q = kron(eye(M), Q_single);
-R = kron(eye(Nu), R_single);
-
-% Reformulate to delta u
-A_rd = [A_r,B_r; zeros(M*Nu, M*Nx), eye(M*Nu, M*Nu)];
-B_rd = [B_r; eye(M*Nu)];
-
-
-% % Reformulation to Delta u
-% A_a = [A,B; zeros(Nu,Nu),eye(n)]; % X(k) = [x(k),y(k),vx(k-1),vy(k-1)]^T
-% B_a = [B; eye(Nu)];                % Du(k) = [vx(k)-vx(k-1), vy(k)-vy(k-1)]^T
-% n_a = size(A_a,1);
-% l_a = size(B_a,2);
-% 
-% % Expanded to include all M robots (DEFINED INCORRECTLY -> Assumes [x1;y1;vx1;vy1;x2;y2;...] should assume [x1;y1;x2;y2;...;vx1;vy1;...])
-% A_aN = kron(eye(M), A_a);
-% B_aN = kron(eye(M), B_a);
-
 %% MPC object
 % Setup opti
 opti = Opti();
@@ -112,9 +79,8 @@ du = opti.variable(M*Nu, Hu);   % Delta u (change in robot control input)
 p = opti.variable(Nx_p,Hp+1);  % KF error covariance diagonal elements
 x = opti.variable(M*Nx,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints    
 
-
 % Enforce initial conditions on variables
-%opti.subject_to(x(:,1) == );
+opti.subject_to(x(:,1) == rob_init{1});
 
 % % Decision variables (to be optimized over)
 % DU = opti.variable(M*l_a,Hu);
