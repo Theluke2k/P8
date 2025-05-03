@@ -110,15 +110,17 @@ cost = 0;
 for i = 1:Hu
     cost = cost + du(:,i)'*R*du(:,i);
 end
-
 % Kalman Filter
-dummy1 = zeros(Nx_p);
-[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
-
-
+cost_KF = 0;
 for i = 1:Hp
-    
+    cost_KF = cost_KF + p'*Q*p;
 end
+% TODO include kalman filter as constaints
+% dummy1 = zeros(Nx_p);
+% [t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
+
+
+
 
 
 cost_KF = 0;
