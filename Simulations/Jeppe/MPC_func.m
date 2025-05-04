@@ -45,8 +45,7 @@ P(:,:,1) = kf_init{2};      % KF error covariance matrix fom k-1
 
 %% Robot model and Tuning
 % Tuning for a single robot
-Q_single = [1 0;
-     0 1];
+Q = eye(Nx_p);
 R_single = [1 0;
      0 1];
 
@@ -63,7 +62,7 @@ A_rd = [A_r,B_r; zeros(M*Nu_r, M*Nx_r), eye(M*Nu_r, M*Nu_r)];
 B_rd = [B_r; eye(M*Nu_r)];
 
 % Construct full tuning matrices
-Q = kron(eye(Nx_p), Q_single);
+%Q = kron(eye(Nx_p), Q_single);
 R = kron(eye(M), R_single);
 
 x0 = rob_init{1};
@@ -110,14 +109,18 @@ cost = 0;
 for i = 1:Hu
     cost = cost + du(:,i)'*R*du(:,i);
 end
+
 % Kalman Filter
 cost_KF = 0;
 for i = 1:Hp
-    cost_KF = cost_KF + p'*Q*p;
+    cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
 end
+
+for 
+
 % TODO include kalman filter as constaints
 % dummy1 = zeros(Nx_p);
-% [t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
+[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
 
 
 
