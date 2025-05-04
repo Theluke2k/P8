@@ -2,7 +2,7 @@
 clc; clear; close all;
 %% Adjustable Parameters
 % General simulation parameters
-M = 8;                  % Number of robots
+M = 3;                  % Number of robots
 dt = 0.1;               % Sampling period [s]
 sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps

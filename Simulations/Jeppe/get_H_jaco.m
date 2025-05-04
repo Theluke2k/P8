@@ -5,7 +5,7 @@ function [H] = get_H_jaco(z, x, M)
         py = x(2*m);    % Robot y_position
 
         % Build row of jacobian
-        %row = zeros(1,Nx_r);
+        row = zeros(1,Nx_r);
         row(1,1) = get_h(z, px, py)/z(1);
         row(1,3) = get_h(z, px, py)*(1/z(3) - ((px - z(5))^2 + (py - z(7))^2));
         row(1,5) = get_h(z, px, py)*(-2*z(3)*(z(5) - px));

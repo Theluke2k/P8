@@ -74,18 +74,28 @@ opti = Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
-z_est = opti.variable(Nx_p,Hp+1);   % Kalman filter states
-P = opti.varaible(Hp*Nx_p,Nx_p);    % Kalman filter error covariance matrix
 
 % States and varialbes (NOT to be optimized over)
-p = opti.parameter(Nx_p,Hp+1);  % KF error covariance diagonal elements
-x = opti.parameter(M*Nx_r,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints  
-
+x = opti.parameter(M*Nx_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
+z_est = opti.parameter(Nx_p,Hp+1);          % Kalman filter states
+P = opti.parameter(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
+p = opti.parameter(Nx_p,Hp+1);              % KF error covariance diagonal elements
+z_hat = opti.parameter(Nx_p,Hp+1);
+P_hat = opti.parameter(Nx_p,(Hp+1)*Nx_p);
+H = opti.parameter(M,(Hp+1)*Nx_p);
+h_vec = opti.parameter(M,Hp+1);
+K = opti.parameter(Nx_p,(Hp+1)*M);
 
 % Enforce initial conditions on variables
-%x(:,1) = x0;
-
-%opti.subject_to(x(:,1) == rob_init{1});
+opti.set_value(x(:,1), x0);
+opti.set_value(z_est(:,1), z_est_0);
+opti.set_value(P(:,1:Nx_p), P_0);
+opti.set_value(p(:,1), zeros(Nx_p,1));  % This is to ensure that indices are matched
+opti.set_value(z_hat(:,1), zeros(Nx_p,1));% This is to ensure that indices are matched
+opti.set_value(P_hat(:,1:Nx_p), zeros(Nx_p,Nx_p));
+opti.set_value(H(:,1:Nx_p), zeros(M,Nx_p));
+opti.set_value(h_vec(:,1), zeros(M,1));
+opti.set_value(K(:,1:M), zeros(Nx_p,M));
 
 % % Decision variables (to be optimized over)
 % DU = opti.variable(M*l_a,Hu);
@@ -114,17 +124,38 @@ for i = 1:Hu
     cost = cost + du(:,i)'*R*du(:,i);
 end
 
-% Kalman Filter
+% Error covariance trace
 cost_KF = 0;
 for i = 1:Hp
     cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
 end
 
-for 
-
+% Kalman filter iterations
+for i = 2:Hp+1
+    % PREDICTION STEP
+    z_hat(:,i) = A_p*z_est(:,i-1) + B_p*u_p(:,i-1)
+    P_hat = A_p*P(:,(i-2)*Nx_p+1:(i-1)*Nx_p)*A_p' + Q_p;
+    
+    % PREPROCESSING
+    for m = 1:M
+        h_vec(m,i) = get_h(z_hat(:,i),x(2*m-1,i),x(2*m));
+        
+        H(1,i) = h_vec(m,i) / z_est(1,i);
+        opti.set_value(H(2,i), 0);
+        H(3,i) = h_vec(m,i) * (1/z_est(3,i) - ((x(2*m-1,i) - z_est(5,i))^2 + (x(2*m) - z_est(7,i))^2));
+        opti.set_value(H(4,i), 0);
+        H(5,i) = h_vec(m,i) * (-2*z_est(3,i)*(z_est(5,i) - x(2*m-1,i)));
+        opti.set_value(H(6,i), 0);
+        H(7,i) = h_vec(m,i) * (-2*z_est(3,i)*(z_est(7,i) - x(2*m)));
+        opti.set_value(H(8,i), 0);
+    end
+    
+    % UPDATE STEP
+    K(:,(i-1)*M+1:i*M) = (P_hat*H_x') / (H_x*P_hat*H_x' + R);
+end
 % TODO include kalman filter as constaints
 % dummy1 = zeros(Nx_p);
-[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
+%[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
 
 
 
