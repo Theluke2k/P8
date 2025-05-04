@@ -141,9 +141,13 @@ for k = 1:Hp
 
         % Linearize
         H_KF(j,1) = h_KF(j,k)/(Z_KF(1,k)+eps);
+        opti.subject_to(H_KF(j,2) == 0);
         H_KF(j,3) = -h_KF(j,k)*((x_pos-Z_KF(5,k))^2 + (y_pos-Z_KF(7,k))^2) + h_KF(j,k)/(Z_KF(3,k)+eps);
+        opti.subject_to(H_KF(j,4) == 0);
         H_KF(j,5) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(5,k)-x_pos);
+        opti.subject_to(H_KF(j,6) == 0);
         H_KF(j,7) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(7,k)-y_pos);
+        opti.subject_to(H_KF(j,8) == 0);
     end
     K_KF = P_KF_pred(8*k-7:8*k,:)*H_KF'*inv(H_KF*P_KF_pred(8*k-7:8*k,:)*H_KF' + R_KF);
 

@@ -4,7 +4,7 @@ addpath('C:\Program Files\MATLAB/casadi-3.7.0-windows64-matlab2018b')
 %% Process simulation parameters
 N = 3;                  % Number of robots
 dt = 0.5;               % Time step [s]
-sim_time = 50;          % Simulation time [s]
+sim_time = 10;          % Simulation time [s]
 T = sim_time/dt;        % Total # of simulation steps
 Ts = 1;                 % MPC sampling time
 sim_params = [Ts, dt];
@@ -16,8 +16,8 @@ cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 0.5;                  % Minimum distance between robots
 
 % Map bounderies
-xmin = 0; xmax = 40;
-ymin = 0; ymax = 40;
+xmin = -40; xmax = 40;
+ymin = -40; ymax = 40;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial model parameters
@@ -29,8 +29,8 @@ ys_ref = 20;
 % Initial derivative states
 M_dot = 0;
 beta_dot = 0;
-xs_dot = 0;
-ys_dot = 0;
+xs_dot = 20;
+ys_dot = 20;
 
 % Initial true state vector
 z = zeros(8,T+1);
@@ -56,8 +56,8 @@ kf_init = [z_pred, P_pred];
 % Initial robot positions, Z0 and control inputs, Uprev
 X0 = zeros(2*N,1); % (assuming N=4, so 2*N values)
 for j = 1:N
-    X0(2*j-1) = xs_ref + j;
-    X0(2*j) = ys_ref;
+    X0(2*j-1) = 0 + j;
+    X0(2*j) = 0;
 end
 Uprev = zeros(2*N,1);           % (2*N values again)
 
