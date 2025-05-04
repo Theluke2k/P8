@@ -32,16 +32,17 @@ u_p = kf_init{5};          % Process input
 Q_p = kf_init{6};          % Process noise covariance matrix
 R_p = kf_init{7};          % Measurement noise covariance matrix
 error_cv_selec = kf_init{8};% Selection of diagonal elements to have in cost function
+z_est_0 = kf_init{1};    % KF state from k-1
+P_0 = kf_init{2};      % KF error covariance matrix fom k-1
 
 % Useful numbers
 Nx_p = size(A_p,1);       % Number of states in process model
 Nu_p = size(B_p,2);       % Number of inputs in process model
 
 % Define initial conditions
-z_est = zeros(Nx_p,Hp+1);      % Estimated process states
-P = zeros(Nx_p,Nx_p,Hp+1);        % KF error covariance matrix
-z_est(:,1) = kf_init{1};    % KF state from k-1
-P(:,:,1) = kf_init{2};      % KF error covariance matrix fom k-1
+%z_est = zeros(Nx_p,Hp+1);      % Estimated process states
+%P = zeros(Nx_p,Nx_p,Hp+1);        % KF error covariance matrix
+
 
 %% Robot model and Tuning
 % Tuning for a single robot
@@ -73,10 +74,13 @@ opti = Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
+z_est = opti.variable(Nx_p,Hp+1);   % Kalman filter states
+P = opti.varaible(Hp*Nx_p,Nx_p);    % Kalman filter error covariance matrix
 
 % States and varialbes (NOT to be optimized over)
 p = opti.parameter(Nx_p,Hp+1);  % KF error covariance diagonal elements
 x = opti.parameter(M*Nx_r,Hp+1);   % Robot positions defined as optimization variables but are bounded by constraints  
+
 
 % Enforce initial conditions on variables
 %x(:,1) = x0;
