@@ -124,16 +124,11 @@ for i = 1:Hu
     cost = cost + du(:,i)'*R*du(:,i);
 end
 
-% Error covariance trace
-cost_KF = 0;
-for i = 1:Hp
-    cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
-end
-
 % Kalman filter iterations
 H = MX.zeros(M,(Hp+1)*Nx_p);
 h_vec = MX.zeros(M,Hp+1);
 K = MX.zeros(Nx_p,(Hp+1)*M);
+
 for i = 2:Hp+1
     Pcols = (i-1)*Nx_p+1:i*Nx_p;
     Hcol = (i-1)*Nx_p+1;
@@ -164,7 +159,11 @@ end
 %[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
 
 
-
+% Error covariance trace (MUST BE LAST)
+cost_KF = 0;
+for i = 1:Hp
+    cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
+end
 
 
 cost_KF = 0;
