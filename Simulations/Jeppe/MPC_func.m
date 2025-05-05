@@ -125,6 +125,41 @@ for i = 1:Hu
 end
 
 % Kalman filter iterations
+% z_est = MX.zeros(Nx_p,1);
+% P = MX.zeros(Nx_p,Nx_p);
+for i = 2:Hp+1
+    % Define temp. variables
+    H = MX.zeros(M,Nx_p);
+    h_vec = MX.zeros(M,1);
+    K = MX.zeros(Nx_p,M);
+    z_hat = MX.zeros(Nx_p,1);
+    P_hat = MX.zeros(Nx_p,Nx_p);
+    
+    % PREDICTION STEP
+    z_hat = A_p*z_est(:,i-1) + B_p*u_p(:,i-1);
+    P_hat = A_p*P(:,(i-2)*Nx_p+1:(i-1)*Nx_p)*A_p' + Q_p;
+
+    % PREPROCESSING
+    for m = 1:M
+        % 
+        h_vec(m) = get_h(z_hat,x(2*m-1,i),x(2*m));
+
+        % Compute Jacobian
+        H(m,1) = h_vec(m) / z_est(1,i);
+        H(m,3) = h_vec(m) * (1/z_est(3,i) - ((x(2*m-1,i) - z_est(5,i))^2 + (x(2*m) - z_est(7,i))^2));
+        H(m,5) = h_vec(m) * (-2*z_est(3,i)*(z_est(5,i) - x(2*m-1,i)));
+        H(m,7) = h_vec(m) * (-2*z_est(3,i)*(z_est(7,i) - x(2*m)));
+    end
+    
+    % UPDATE STEP
+    K = (P_hat*H') / (H*P_hat*H' + R_p);
+    P(:,(i-1)*Nx_p+1:i*Nx_p) = P_hat - K*H*P_hat;
+    
+    % Define p as the diagonal elements of P
+    p(:,i) = diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
+end
+
+% Kalman filter iterations
 H = MX.zeros(M,(Hp+1)*Nx_p);
 h_vec = MX.zeros(M,Hp+1);
 K = MX.zeros(Nx_p,(Hp+1)*M);

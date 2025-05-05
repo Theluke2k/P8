@@ -9,15 +9,15 @@ opti = Opti();
 
 % Create decision variables
 x = opti.variable();
-y = x;
+y = 1;
 
 z = y;
 
-opti.subject_to(x >= 0);
-
 % Define objective function
-opti.minimize( z );
+opti.minimize(  );
 
+% Because casadis default initial guess is 0,0.
+opti.set_initial(x, [1;1]);    % so x(1)+x(2)=2, safe
 
 % Configure printing for ipopt solver
 opts = struct();
