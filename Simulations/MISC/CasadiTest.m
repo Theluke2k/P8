@@ -8,25 +8,23 @@ import casadi.*
 opti = Opti();
 
 % Create decision variables
-x = opti.variable(2,1);
+du = opti.variable();
+x = opti.variable();
 
-% Create parameters
-p = opti.parameter(2,1);
+z = 2*x
+x = du + 4;
 
 % Define constraints
-opti.subject_to(x >= p)
+opti.subject_to(x+z >= 0)
 
 % Define objective function
-opti.minimize( x(1,1) + x(2,1) );
+opti.minimize( x+z );
 
 % Configure printing for ipopt solver
 opts = struct();
 opts.ipopt.print_level = false;
 
-opti.set_value(p,[5; 11]);
-
 % Choose the ipopt solver
 opti.solver('ipopt', opts);
 sol = opti.solve();
-x_opt= sol.value(x);
-disp(x_opt)
+sol.value(du)

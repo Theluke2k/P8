@@ -82,9 +82,6 @@ P = opti.parameter(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance mat
 p = opti.parameter(Nx_p,Hp+1);              % KF error covariance diagonal elements
 z_hat = opti.parameter(Nx_p,Hp+1);
 P_hat = opti.parameter(Nx_p,(Hp+1)*Nx_p);
-%H = opti.parameter(M,(Hp+1)*Nx_p);
-%h_vec = opti.parameter(M,Hp+1);
-%K = opti.parameter(Nx_p,(Hp+1)*M);
 
 % Enforce initial conditions on variables
 opti.set_value(x(:,1), x0);
@@ -93,28 +90,7 @@ opti.set_value(P(:,1:Nx_p), P_0);
 opti.set_value(p(:,1), zeros(Nx_p,1));  % This is to ensure that indices are matched
 opti.set_value(z_hat(:,1), zeros(Nx_p,1));% This is to ensure that indices are matched
 opti.set_value(P_hat(:,1:Nx_p), zeros(Nx_p,Nx_p));
-%opti.set_value(H(:,1:Nx_p), zeros(M,Nx_p));
-%opti.set_value(h_vec(:,1), zeros(M,1));
-%opti.set_value(K(:,1:M), zeros(Nx_p,M));
 
-% % Decision variables (to be optimized over)
-% DU = opti.variable(M*l_a,Hu);
-% Za = opti.variable(M*n_a,Hp+1);
-% 
-% P_KF_est = opti.variable(8*Hp,8);
-% P_KF_pred = opti.variable(8*(Hp+1),8);
-% 
-% Z_KF = opti.variable(8,Hp+1);
-% h_KF = opti.variable(M,Hp);
-% 
-% H_KF = opti.variable(M,8);
-% K_KF = opti.variable(8,M);
-% 
-% % Parameters (NOT to be optimized over)
-% Z0 = opti.parameter(M*n,1);
-% Uprev = opti.parameter(M*l,1);
-% Z0_KF = opti.parameter(8,1);
-% P0_KF = opti.parameter(8,8);
 
 
 %% Create Cost Function
@@ -158,124 +134,6 @@ for i = 2:Hp+1
     % UPDATE STEP
     K(:,Kcols) = (P_hat(:,Pcols)*H(:,Hcols)') / (H(:,Hcols)*P_hat(:,Pcols)*H(:,Hcols)' + R_p);
     P(:,Pcols) = P_hat(:,Pcols) - K(:,Kcols)*H(:,Hcols)*P_hat(:,Pcols);
-end
-% TODO include kalman filter as constaints
-% dummy1 = zeros(Nx_p);
-%[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
-
-
-
-
-
-cost_KF = 0;
-Z_KF(:,1) = Z0_KF;
-P_KF_pred(1:8,:) = P0_KF; % P(k|k-1)
-for k = 1:Hp
-    for j = 1:M
-        % Positions
-        x_pos = Za(1+(j-1)*n_a,k);
-        y_pos = Za(2+(j-1)*n_a,k);
-
-        % Measurement predictions
-        h_KF(j,k) = h(Z_KF(:,k), x_pos, y_pos);
-
-        % Linearize
-        H_KF(j,1) = h_KF(j,k)/(Z_KF(1,k)+eps);
-        H_KF(j,3) = -h_KF(j,k)*((x_pos-Z_KF(5,k))^2 + (y_pos-Z_KF(7,k))^2) + h_KF(j,k)/(Z_KF(3,k)+eps);
-        H_KF(j,5) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(5,k)-x_pos);
-        H_KF(j,7) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(7,k)-y_pos);
-    end
-    K_KF = P_KF_pred(8*k-7:8*k,:)*H_KF'*inv(H_KF*P_KF_pred(8*k-7:8*k,:)*H_KF' + R_KF);
-
-    P_KF_est(8*k-7:8*k,:) = (eye(8) - K_KF*H_KF)*P_KF_pred(8*k-7:8*k,:)*(eye(8) - K_KF*H_KF)' + K_KF*R_KF*K_KF'; % P(k|k)
-
-    % Time update
-    Z_KF(:,k+1) = A_KF*Z_KF(:,k) + B_KF*u_KF(:,k);
-    P_KF_pred(8*(k+1)-7:8*(k+1),:) = A_KF*P_KF_est(8*k-7:8*k,:)*A_KF' + Q;
-
-    % Add to cost
-    cost_KF = cost_KF + P_KF_est(8*k-7,1)/20  + P_KF_est(8*k-5,3)*100 + P_KF_est(8*k-3,5) + P_KF_est(8*k-1,7);
-end
-
-% Constraints
-Za0 = [reshape(Z0,n,M); reshape(Uprev,l,M)];
-opti.subject_to(Za(:,1) == reshape(Za0,M*(n+l),1));
-for k = 1:Hp
-    % Dynamics
-    if k <= Hu
-        opti.subject_to(Za(:,k+1) == A_aN*Za(:,k) + B_aN*DU(:,k));
-    else
-        opti.subject_to(Za(:,k+1) == A_aN*Za(:,k)); % DU(k > Hu) = 0
-    end
-
-    % Box constraints
-    opti.subject_to(xmin <= Za(1:n_a:M*n_a,k+1) <= xmax);
-    opti.subject_to(ymin <= Za(2:n_a:M*n_a,k+1) <= ymax);
-
-    % Velocity constraints
-    for j = 1:M
-        x_vel = Za(3+(j-1)*n_a,k+1);
-        y_vel = Za(4+(j-1)*n_a,k+1);
-        opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
-    end
-
-    % % Collision avoidance
-    % for i = 1:M
-    %     for j = i+1:M
-    %         xi = Za((i-1)*n_a + 1, k+1);
-    %         yi = Za((i-1)*n_a + 2, k+1);
-    %         xj = Za((j-1)*n_a + 1, k+1);
-    %         yj = Za((j-1)*n_a + 2, k+1);
-    % 
-    %         dist_squared = (xi - xj)^2 + (yi - yj)^2;
-    %         opti.subject_to(dist_squared >= dmin^2);
-    %     end
-    % end
-end
-
-% Outputs
-Z_opt = [];
-U_opt = [];
-for i = 1:n_a:M*n_a
-    Z_opt = [Z_opt; Za(i,:); Za(i+1,:)];
-    U_opt = [U_opt; Za(i+2,:); Za(i+3,:)];
-end
-
-% Define MPC 'object'
-opti.minimize(lambda1*cost + lambda2*cost_KF);
-
-solver_opts = struct;
-solver_opts.ipopt.max_iter = 2000;
-solver_opts.ipopt.tol = 1e-6;
-solver_opts.ipopt.print_level = verbose_opt;
-% solver_opts.print_time = false;
-opti.solver('ipopt', solver_opts);
-
-%% Call MPC
-% Initialization
-Z0_val = rob_init(:,1); % Initial robot states
-Uprev_val = rob_init(:,2); % Previous control input
-%Z0_KF_val = kf_init(:,1); % Initial prediction for kalman filter
-%P0_KF_val = kf_init(:,2:end); % Initial error covariance
-Z0_KF_val = z_est(:,1);
-P0_KF_val = P(:,:,1);
-
-opti.set_value(Z0, Z0_val);
-opti.set_value(Uprev, Uprev_val);
-opti.set_value(Z0_KF, Z0_KF_val);
-opti.set_value(P0_KF, P0_KF_val);
-
-% Solve
-sol = opti.solve();
-
-% Outputs
-Z_sol = sol.value(Z_opt);
-U_sol = sol.value(U_opt);
-
-P_sol = sol.value(P_KF_pred);
-P_trace = [];
-for k = 1:Hp+1
-    P_trace = [P_trace, log(abs(trace(P_sol(8*k-7:8*k,:))))];
 end
 
 end
