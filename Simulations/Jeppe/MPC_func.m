@@ -73,8 +73,8 @@ x0 = rob_init{1};
 opti = Opti();
 
 % Decision variables (to be optimized over)
-du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
-x = opti.variable(M*Nx_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
+du = opti.variable(M*Nu_r, Hu+1);   % Delta u (change in robot control input)  
+x = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 
 % States and varialbes (NOT to be optimized over)
 z_est = opti.parameter(Nx_p,Hp+1);          % Kalman filter states
@@ -86,8 +86,9 @@ P_hat = opti.parameter(Nx_p,(Hp+1)*Nx_p);
 %h_vec = opti.parameter(M,Hp+1);
 %K = opti.parameter(Nx_p,(Hp+1)*M);
 
-% Enforce initial conditions on variables
-opti.set_value(x(:,1), x0);
+% Enforce initial conditions
+opti.subject_to(du(:,1) == zeros(M*Nu_r,1))
+opti.subject_to(x(1:M*Nx_r,1) == x0);
 opti.set_value(z_est(:,1), z_est_0);
 opti.set_value(P(:,1:Nx_p), P_0);
 opti.set_value(p(:,1), zeros(Nx_p,1));  % This is to ensure that indices are matched
@@ -120,7 +121,7 @@ opti.set_value(P_hat(:,1:Nx_p), zeros(Nx_p,Nx_p));
 %% Create Cost Function
 % Control input
 cost = 0;
-for i = 1:Hu
+for i = 2:Hu+1
     cost = cost + du(:,i)'*R*du(:,i);
 end
 
@@ -141,7 +142,7 @@ for i = 2:Hp+1
 
     % PREPROCESSING
     for m = 1:M
-        % 
+        % Get expected robot measurements with predicted states
         h_vec(m) = get_h(z_hat,x(2*m-1,i),x(2*m));
 
         % Compute Jacobian
@@ -170,7 +171,7 @@ end
 for i = 2:Hp+1
     % Robot dynamics
     if i <= Hu+1
-        opti.subject_to(Za(:,k+1) == A_aN*Za(:,k) + B_aN*DU(:,k));
+        opti.subject_to(x(:,i) == A_aN*Za(:,k) + B_aN*DU(:,k));
     else
         opti.subject_to(Za(:,k+1) == A_aN*Za(:,k)); % DU(k > Hu) = 0
     end
