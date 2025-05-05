@@ -74,9 +74,9 @@ opti = Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
+x = opti.variable(M*Nx_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 
 % States and varialbes (NOT to be optimized over)
-x = opti.parameter(M*Nx_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 z_est = opti.parameter(Nx_p,Hp+1);          % Kalman filter states
 P = opti.parameter(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
 p = opti.parameter(Nx_p,Hp+1);              % KF error covariance diagonal elements
@@ -159,76 +159,21 @@ for i = 2:Hp+1
     p(:,i) = diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
 end
 
-% Kalman filter iterations
-H = MX.zeros(M,(Hp+1)*Nx_p);
-h_vec = MX.zeros(M,Hp+1);
-K = MX.zeros(Nx_p,(Hp+1)*M);
-
-for i = 2:Hp+1
-    Pcols = (i-1)*Nx_p+1:i*Nx_p;
-    Hcol = (i-1)*Nx_p+1;
-    Hcols = Hcol:Hcol+Nx_p-1;
-    Kcols = (i-1)*M+1:i*M;
-
-    % PREDICTION STEP
-    z_hat(:,i) = A_p*z_est(:,i-1) + B_p*u_p(:,i-1)
-    P_hat(:,Pcols) = A_p*P(:,Pcols-Nx_p)*A_p' + Q_p;
-    
-    % PREPROCESSING
-    for m = 1:M
-        h_vec(m,i) = get_h(z_hat(:,i),x(2*m-1,i),x(2*m));
-        
-        % Compute Jacobian
-        H(m,Hcol) = h_vec(m,i) / z_est(1,i);
-        H(m,Hcol+2) = h_vec(m,i) * (1/z_est(3,i) - ((x(2*m-1,i) - z_est(5,i))^2 + (x(2*m) - z_est(7,i))^2));
-        H(m,Hcol+4) = h_vec(m,i) * (-2*z_est(3,i)*(z_est(5,i) - x(2*m-1,i)));
-        H(m,Hcol+6) = h_vec(m,i) * (-2*z_est(3,i)*(z_est(7,i) - x(2*m)));
-    end
-    
-    % UPDATE STEP
-    K(:,Kcols) = (P_hat(:,Pcols)*H(:,Hcols)') / (H(:,Hcols)*P_hat(:,Pcols)*H(:,Hcols)' + R_p);
-    P(:,Pcols) = P_hat(:,Pcols) - K(:,Kcols)*H(:,Hcols)*P_hat(:,Pcols);
-end
-% TODO include kalman filter as constaints
-% dummy1 = zeros(Nx_p);
-%[t1, t2, t3] = EKF(z_est(:,1), P(:,:,1), A_p, zeros(Nx_p,Nu_p), u_p(:,1), Q_p, zeros(M,1), R_p, x(:,1));
-
-
-% Error covariance trace (MUST BE LAST)
+% Now that p has been defined in terms of the robot positions, we can write
+% up the cost
 cost_KF = 0;
 for i = 1:Hp
     cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
 end
 
-
-cost_KF = 0;
-Z_KF(:,1) = Z0_KF;
-P_KF_pred(1:8,:) = P0_KF; % P(k|k-1)
-for k = 1:Hp
-    for j = 1:M
-        % Positions
-        x_pos = Za(1+(j-1)*n_a,k);
-        y_pos = Za(2+(j-1)*n_a,k);
-
-        % Measurement predictions
-        h_KF(j,k) = h(Z_KF(:,k), x_pos, y_pos);
-
-        % Linearize
-        H_KF(j,1) = h_KF(j,k)/(Z_KF(1,k)+eps);
-        H_KF(j,3) = -h_KF(j,k)*((x_pos-Z_KF(5,k))^2 + (y_pos-Z_KF(7,k))^2) + h_KF(j,k)/(Z_KF(3,k)+eps);
-        H_KF(j,5) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(5,k)-x_pos);
-        H_KF(j,7) = -2*h_KF(j,k)*Z_KF(3,k)*(Z_KF(7,k)-y_pos);
+% Constraints
+for i = 2:Hp+1
+    % Robot dynamics
+    if i <= Hu+1
+        opti.subject_to(Za(:,k+1) == A_aN*Za(:,k) + B_aN*DU(:,k));
+    else
+        opti.subject_to(Za(:,k+1) == A_aN*Za(:,k)); % DU(k > Hu) = 0
     end
-    K_KF = P_KF_pred(8*k-7:8*k,:)*H_KF'*inv(H_KF*P_KF_pred(8*k-7:8*k,:)*H_KF' + R_KF);
-
-    P_KF_est(8*k-7:8*k,:) = (eye(8) - K_KF*H_KF)*P_KF_pred(8*k-7:8*k,:)*(eye(8) - K_KF*H_KF)' + K_KF*R_KF*K_KF'; % P(k|k)
-
-    % Time update
-    Z_KF(:,k+1) = A_KF*Z_KF(:,k) + B_KF*u_KF(:,k);
-    P_KF_pred(8*(k+1)-7:8*(k+1),:) = A_KF*P_KF_est(8*k-7:8*k,:)*A_KF' + Q;
-
-    % Add to cost
-    cost_KF = cost_KF + P_KF_est(8*k-7,1)/20  + P_KF_est(8*k-5,3)*100 + P_KF_est(8*k-3,5) + P_KF_est(8*k-1,7);
 end
 
 % Constraints
