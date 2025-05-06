@@ -39,8 +39,8 @@ Nx_p = length(z_0); % Number of states in process state vector
 % Guessed initial process states
 M_0 = 250;
 beta_0 = 0.05;
-xs_0 = 10;
-ys_0 = 10;
+xs_0 = 20;
+ys_0 = 20;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -61,17 +61,17 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 0;
-    x_1(2*m) = 0;
+    x_1(2*m-1) = xs_0;
+    x_1(2*m) = ys_0;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
 %% Dynamic Parameter Model
-tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
+tau_beta = 0.999;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
 Nu_p = 2;
-beta0 = 0.02; %steady-state value for beta
+beta0 = 0.05; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
 u_M = 10; % Leakage rate offset
 u = ones(Nu_p,K+Hp+1);
@@ -115,7 +115,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
+sigma_M = 1; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = G*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G'; % This is the process noise covariance matrix
