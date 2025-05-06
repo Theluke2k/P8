@@ -1,4 +1,4 @@
-function [Z_sol,U_sol,P_trace,opti] = MPC_func(rob_init, kf_init, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
+function [X_opt,U_opt,P_trace,opti] = MPC_func(rob_init, kf_init, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
 %% Parameters
 import casadi.*
 
@@ -6,7 +6,7 @@ import casadi.*
 xmin = map_bounds(1); xmax = map_bounds(2);
 ymin = map_bounds(3); ymax = map_bounds(4);
 dmin = min_dist;
-vmax = 2;
+vmax = 20;
 
 % MPC parameters
 Hp = mpc_params(1); % Prediction horizon
@@ -47,8 +47,12 @@ Nu_p = size(B_p,2);       % Number of inputs in process model
 %% Robot model and Tuning
 % Tuning for a single robot
 Q = eye(Nx_p);
-R_single = [1 0;
-     0 1];
+Q(2,2) = 0;
+Q(4,4) = 0;
+Q(6,6) = 0;
+Q(8,8) = 0;
+R_single = [0 0;
+     0 0];
 
 % Import robot dynamics from parameters
 A_r = rob_init{2};    % Robot system matrix
@@ -66,7 +70,10 @@ B_rd = [B_r; eye(M*Nu_r)];
 %Q = kron(eye(Nx_p), Q_single);
 R = kron(eye(M), R_single);
 
-x0 = rob_init{1};
+% Robot initial conditions
+pos0 = rob_init{1};
+u0 = rob_init{4};
+x0 = [pos0; u0];    % Initial condition for delta u formulation
 
 %% MPC object
 % Setup opti
@@ -74,24 +81,30 @@ opti = Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu+1);   % Delta u (change in robot control input)  
-x = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
+x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 
 % States and varialbes (NOT to be optimized over)
-z_est = opti.parameter(Nx_p,Hp+1);          % Kalman filter states
-P = opti.parameter(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
-p = opti.parameter(Nx_p,Hp+1);              % KF error covariance diagonal elements
-z_hat = opti.parameter(Nx_p,Hp+1);
-P_hat = opti.parameter(Nx_p,(Hp+1)*Nx_p);
+z_est = MX.zeros(Nx_p,Hp+1);          % Kalman filter states
+P = MX.zeros(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
+p = MX.zeros(Nx_p,Hp+1);              % KF error covariance diagonal elements
+%z_hat = opti.zeros(Nx_p,Hp+1);
+%P_hat = opti.zeros(Nx_p,(Hp+1)*Nx_p);
 %H = opti.parameter(M,(Hp+1)*Nx_p);
 %h_vec = opti.parameter(M,Hp+1);
 %K = opti.parameter(Nx_p,(Hp+1)*M);
 
 % Enforce initial conditions
 opti.subject_to(du(:,1) == zeros(M*Nu_r,1))
-opti.subject_to(x(1:M*Nx_r,1) == x0);
-opti.set_value(z_est(:,1), z_est_0);
-opti.set_value(P(:,1:Nx_p), P_0);
-opti.set_value(p(:,1), zeros(Nx_p,1));  % This is to ensure that indices are matched
+opti.subject_to(x_rd(:,1) == x0);
+z_est(:,1) = z_est_0;
+P(:,1:Nx_p) = P_0;
+
+
+
+
+%opti.set_value(z_est(:,1), z_est_0);
+%opti.set_value(P(:,1:Nx_p), P_0);
+%opti.set_value(p(:,1), zeros(Nx_p,1));  % This is to ensure that indices are matched
 %opti.set_value(z_hat(:,1), zeros(Nx_p,1));% This is to ensure that indices are matched
 %opti.set_value(P_hat(:,1:Nx_p), zeros(Nx_p,Nx_p));
 
@@ -105,6 +118,11 @@ for i = 2:Hu+1
 end
 
 % Kalman filter iterations
+z_hat_dum = MX.zeros(Nx_p,Hp+1);
+K_dum = MX.zeros(Nx_p,(Hp+1)*M);
+H_dum = MX.zeros(M,(Hp+1)*Nx_p);
+P_hat_dum = MX.zeros(Nx_p,(Hp+1)*Nx_p);
+
 for i = 2:Hp+1
     % Define temp. variables
     H = MX.zeros(M,Nx_p);
@@ -116,17 +134,18 @@ for i = 2:Hp+1
     % PREDICTION STEP
     z_hat = A_p*z_est(:,i-1) + B_p*u_p(:,i-1);
     P_hat = A_p*P(:,(i-2)*Nx_p+1:(i-1)*Nx_p)*A_p' + Q_p;
+    z_est(:,i) = z_hat;
 
     % PREPROCESSING
     for m = 1:M
         % Get expected robot measurements with predicted states
-        h_vec(m) = get_h(z_hat,x(2*m-1,i),x(2*m));
+        h_vec(m) = get_h(z_hat,x_rd(2*m-1,i),x_rd(2*m));
 
         % Compute Jacobian
-        H(m,1) = h_vec(m) / z_est(1,i);
-        H(m,3) = h_vec(m) * (1/z_est(3,i) - ((x(2*m-1,i) - z_est(5,i))^2 + (x(2*m) - z_est(7,i))^2));
-        H(m,5) = h_vec(m) * (-2*z_est(3,i)*(z_est(5,i) - x(2*m-1,i)));
-        H(m,7) = h_vec(m) * (-2*z_est(3,i)*(z_est(7,i) - x(2*m)));
+        H(m,1) = h_vec(m) / z_hat(1);
+        H(m,3) = h_vec(m) * (1/z_hat(3) - ((x_rd(2*m-1,i) - z_hat(5))^2 + (x_rd(2*m,i) - z_hat(7))^2));
+        H(m,5) = h_vec(m) * (-2*z_hat(3)*(z_hat(5) - x_rd(2*m-1,i)));
+        H(m,7) = h_vec(m) * (-2*z_hat(3)*(z_hat(7) - x_rd(2*m,i)));
     end
     
     % UPDATE STEP
@@ -135,6 +154,13 @@ for i = 2:Hp+1
     
     % Define p as the diagonal elements of P
     p(:,i) = diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
+
+    % Collection :)
+    z_hat_dum(:,i) = z_hat;
+    P_hat_dum(:,(i-1)*Nx_p+1:i*Nx_p) = P_hat;
+    K_dum(:,(i-1)*M+1:i*M) = K;
+    H_dum(:, (i-1)*Nx_p+1:i*Nx_p) = H;
+
 end
 
 % Now that p has been defined in terms of the robot positions, we can write
@@ -148,29 +174,63 @@ end
 for i = 2:Hp+1
     % Robot dynamics
     if i <= Hu+1
-        opti.subject_to(x(:,i) == A_rd*x(:,i-1) + B_rd*du(:,i));
+        opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1) + B_rd*du(:,i));
     else
-        opti.subject_to(x(:,i) == A_rd*x(:,i-1)); % DU(k > Hu) = 0
+        opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1)); % DU(k > Hu) = 0
     end
 
-    % Velocity constraints
+    % Robot constraints
     for m = 1:M
-        x_vel = x(M+2*m);
-        y_vel = x(M+2*m+1);
+        % Velocity and box constraints
+        x_vel = x_rd(2*M+2*m-1,i);
+        y_vel = x_rd(2*M+2*m,i);
         opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
+
+        % Box constraints
+        opti.subject_to(xmin <= x_rd(2*m-1,:));
+        opti.subject_to(xmax >= x_rd(2*m-1,:));
+        opti.subject_to(ymin <= x_rd(2*m,:));
+        opti.subject_to(ymax >= x_rd(2*m,:));
+        
+        % % Collision constraints
+        % for j = m+1:M
+        %     x_m = x_rd(2*m-1, i);
+        %     y_m = x_rd(2*m, i);
+        %     x_j = x_rd(2*j-1, i);
+        %     y_j = x_rd(2*j,i);
+        %     dist_squared = (x_m - x_j)^2 + (y_m - y_j)^2;
+        %     opti.subject_to(dist_squared >= dmin^2);
+        % end
+
     end
 end
 
 % Define MPC 'object'
 opti.minimize(cost + cost_KF);
-
-
-opti.solver('ipopt');
+solver_opts = struct();
+solver_opts.ipopt.max_iter = 500;
+solver_opts.ipopt.tol = 1e-6;
+solver_opts.ipopt.print_level = verbose_opt;
+solver_opts.print_time = false;
+opti.solver('ipopt', solver_opts);
 
 %% Call MPC
+%sol = opti.solve();
 
 % Solve
-sol = opti.solve();
+try
+    sol = opti.solve();
+
+catch
+    disp("MPC FAILED!!! :((((")
+    opti.debug.value(H)   
+end
+
+% Outputs
+X_opt = sol.value(x_rd(1:2*M,:));
+U_opt = sol.value(x_rd(2*M+1:end,:));
+P_trace = 0;
+
 
 end
 

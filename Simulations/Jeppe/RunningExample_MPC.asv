@@ -16,7 +16,7 @@ Hp = 6;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
-min_dist = 5;                  % Minimum distance between robots
+min_dist = 0.5;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 40;
@@ -29,9 +29,9 @@ M_ref = 250;
 M_dot_ref = 0;
 beta_ref = 0.05;
 beta_dot_ref = 0;
-xs_ref = 20;
+xs_ref = 10;
 xs_dot_ref = 0;
-ys_ref = 20;
+ys_ref = 10;
 ys_dot_ref = 0;
 z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_dot_ref]; % Initial true state vector
 Nx_p = length(z_0); % Number of states in process state vector
@@ -41,9 +41,9 @@ M_0 = 250;
 M_dot_0 = 0;
 beta_0 = 0.05;
 beta_dot_0 = 0;
-xs_0 = 5;
+xs_0 = 10;
 xs_dot_0 = 0;
-ys_0 = 10;
+ys_0 = 0;
 ys_dot_0 = 0;
 z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % Initial guessed state vector
 
@@ -61,8 +61,8 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 0;
-    x_1(2*m) = 0;
+    x_1(2*m-1) = xs_ref;
+    x_1(2*m) = ys_ref;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
@@ -121,7 +121,7 @@ mu_w = zeros(length(v),1);
 Q = G*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G'; % This is the process noise covariance matrix
 
 % Measurement noise
-sigma_measurement = 0.01;
+sigma_measurement = 0.001;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
 
@@ -275,31 +275,32 @@ z_hat = zeros(Nx_p,K+1);
 z_hat(:,1) = z_est(:,1);
 
 for k=2:K+1
+    clc
     % Update true process
     w = G*normrnd(mu_w,v);
     z(:,k) = A*z(:,k-1) + B*u(:,k-1) + w;
     
-    % % Update robot positions
-    % for m = 1:M
-    %     % Update robot positions
-    %     % x(m,k) = z(m,k-1) + normrnd(0, 1);
-    %     % x(2*m-1,k) = z(5,k-1) + normrnd(0, 2);
-    %     % x(2*m,k) = z(7,k-1) + normrnd(0, 2);
-    %     %Randomly update speed/turn rate
-    %     if rand() < 0.5
-    %         robot_v(m) = max_speed * rand();
-    %         robot_omega(m) = (rand()-0.5)*2*max_omega;
-    %     end
-    % 
-    %     % Update orientation
-    %     robot_theta(m) = mod(robot_theta(m) + robot_omega(m)*dt, 2*pi);
-    % 
-    %     % Proposed new position
-    %     x(2*m-1,k) = x(2*m-1,k-1) + robot_v(m)*cos(robot_theta(m))*dt;
-    %     x(2*m,k) = x(2*m,k-1) + robot_v(m)*sin(robot_theta(m))*dt;
-    %     % TODO (right now we cheated using MPC output)
-    % end
-    x(:,k) = A_r*x(:,k-1) + B_r*u_opt;
+    % Update robot positions
+    for m = 1:M
+        % Update robot positions
+        % x(m,k) = z(m,k-1) + normrnd(0, 1);
+        % x(2*m-1,k) = z(5,k-1) + normrnd(0, 2);
+        % x(2*m,k) = z(7,k-1) + normrnd(0, 2);
+        %Randomly update speed/turn rate
+        if rand() < 0.5
+            robot_v(m) = max_speed * rand();
+            robot_omega(m) = (rand()-0.5)*2*max_omega;
+        end
+
+        % Update orientation
+        robot_theta(m) = mod(robot_theta(m) + robot_omega(m)*dt, 2*pi);
+
+        % Proposed new position
+        x(2*m-1,k) = x(2*m-1,k-1) + robot_v(m)*cos(robot_theta(m))*dt;
+        x(2*m,k) = x(2*m,k-1) + robot_v(m)*sin(robot_theta(m))*dt;
+        % TODO (right now we cheated using MPC output)
+    end
+    %x(:,k) = A_r*x(:,k) + B_r*u_opt;
 
     % Take measurements
     r = mvnrnd(mu_r',R)';

@@ -29,7 +29,7 @@ function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, pos
     %K = P_hat*H_x'*inv(H_x*P_hat*H_x' + R)     % Numerically unstable
     K = (P_hat*H_x') / (H_x*P_hat*H_x' + R);    % More accurate comp.
     x = x_hat + K*v;
-    P = P_hat - K*H_x*P_hat
+    P = P_hat - K*H_x*P_hat;
     %P = (eye(length(x)) - K*H_x)*P_hat*(eye(length(x)) - K*H_x)' + K*R*K'    
 end
 
