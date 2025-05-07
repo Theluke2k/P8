@@ -1,4 +1,4 @@
-function [X_opt,U_opt,P_trace,opti] = MPC_func(rob_init, kf_init, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
+function [X_opt,U_opt,P_trace,opti] = MPC_func(rob_init, kf_init, en_params, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt)
 %% Parameters
 import casadi.*
 
@@ -69,6 +69,12 @@ R = kron(eye(M), R_single);
 pos0 = rob_init{1};
 u0 = rob_init{4};
 x0 = [pos0; u0];    % Initial condition for delta u formulation
+
+%% ENERGY
+% Extract energy package info
+e0 = en_params{1};
+power = en_params{2};
+charge_rate = en_params{3};
 
 %% MPC object
 % Setup opti
@@ -194,7 +200,7 @@ for i = 2:Hp+1
         opti.subject_to(xmax >= x_rd(2*m-1,:));
         opti.subject_to(ymin <= x_rd(2*m,:));
         opti.subject_to(ymax >= x_rd(2*m,:));
-        
+       
         % % Collision constraints
         % for j = m+1:M
         %     x_m = x_rd(2*m-1, i);
@@ -205,6 +211,9 @@ for i = 2:Hp+1
         %     opti.subject_to(dist_squared >= dmin^2);
         % end
 
+        % Energy constraints
+        
+        
     end
 end
 

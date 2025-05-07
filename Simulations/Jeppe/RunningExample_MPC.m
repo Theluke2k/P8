@@ -192,6 +192,15 @@ B_r_MPC = kron(eye(M), B_r_single_MPC);
 Nx_r = size(A_r_single,1);
 Nu_r = size(B_r_single,2);
 
+%% Energy
+% Energy variables
+e = zeros(M,K+1);
+e(:,1) = ones(M,1);     % Robots fully charged at time 0
+
+% Energy dynamics
+power = @(v) 0.0001*v^2 + 0.002;
+charge_rate = 0.02;
+
 %% Create Required Vectors and Matrices
 % MPC
 x = zeros(2*M,K+1);         % Robot positions
@@ -317,9 +326,12 @@ for k=2:K+1
 
     % Package all robot information
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
+
+    % Package energy information
+    EN_params = {e(:,k), power, charge_rate};
     
     % Compute optimal stuff
-    [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2);
+    [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2);
     u_opt = U_opt(:,2);
     %x(:,k+1) = X_opt(:,2);
 
