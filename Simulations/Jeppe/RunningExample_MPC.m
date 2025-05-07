@@ -12,8 +12,8 @@ state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 
 % MPC parameters
-Hp = 5;             % Prediction horizon
-Hu = 5;             % Control horizon
+Hp = 6;             % Prediction horizon
+Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 5;                  % Minimum distance between robots
@@ -25,7 +25,7 @@ zmin = 0; zmax = 20;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
-M_ref = 250;
+M_ref = 1000;
 beta_ref = 0.05;
 xs_ref = 20;
 ys_ref = 20;
@@ -37,7 +37,7 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 250;
+M_0 = 500;
 beta_0 = 0.05;
 xs_0 = 10;
 ys_0 = 10;
@@ -71,7 +71,7 @@ tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
 Nu_p = 2;
-beta0 = 0.02; %steady-state value for beta
+beta0 = 0.001; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
 u_M = 10; % Leakage rate offset
 u = ones(Nu_p,K+Hp+1);
@@ -121,7 +121,7 @@ mu_w = zeros(length(v),1);
 Q = G*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G'; % This is the process noise covariance matrix
 
 % Measurement noise
-sigma_measurement = 0.01;
+sigma_measurement = 0.1;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
 
@@ -196,10 +196,22 @@ Nu_r = size(B_r_single,2);
 % Energy variables
 e = zeros(M,K+1);
 e(:,1) = ones(M,1);     % Robots fully charged at time 0
+charging = zeros(M,K+1);
+e_full = zeros(M,K+1);
 
 % Energy dynamics
-power = @(v) 0.0001*v^2 + 0.002;
+t1 = 2;
+o1 = 5;
 charge_rate = 0.02;
+power = @(x,y,v) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
+%power = @(v) 0.0001*v^2 + 0.05;
+%power = 0.05;
+
+
+% Parameters
+charger_x = 0;
+charger_y = 0;
+charger_r = 4;
 
 %% Create Required Vectors and Matrices
 % MPC
@@ -312,6 +324,24 @@ for k=2:K+1
     % Update robot positions
     x(:,k) = A_r*x(:,k-1) + B_r*u_opt;
 
+    % Energy dynamics
+    for m = 1:M
+        % Check if the robot were at the charging station at the time step before
+        % if((x(2*m-1,k-1) - charger_x)^2 + (x(2*m,k-1) - charger_y)^2 <= charger_r^2)
+        %     charging(m,k-1) = 1;
+        % else
+        %     charging(m,k-1) = 0;
+        % end
+        % if(e(m,k-1) >= 1-charge_rate*dt)
+        %     e_full(m,k-1) = 1;
+        % else
+        %     e_full(m,k-1) = 0;
+        % end
+        % Compute new energy
+        e(m,k) = e(m,k-1) + power(x(2*m-1),x(2*m),sqrt(u_opt(2*m-1)^2 + u_opt(2*m)^2))*dt;
+    end
+    %disp(e(:,k));
+
     % Take measurements
     r = mvnrnd(mu_r',R)';
     y(:,k) = get_h_vec(z(:,k), x(:,k), M) + r;
@@ -328,9 +358,10 @@ for k=2:K+1
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
 
     % Package energy information
-    EN_params = {e(:,k), power, charge_rate};
+    EN_params = {e(:,k), power, charge_rate, charger_x, charger_y, charger_r};
     
     % Compute optimal stuff
+    disp(x(:,k));
     [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2);
     u_opt = U_opt(:,2);
     %x(:,k+1) = X_opt(:,2);

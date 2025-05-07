@@ -187,8 +187,6 @@ end
 %     y_pos = x_rd(2*m,i-1);
 % end
 
-power_cons = @(v) 0.0001*v^2 + 0.05;
-
 % Constraints
 for i = 2:Hp+1
     % Robot dynamics
@@ -222,20 +220,19 @@ for i = 2:Hp+1
         % end
 
         % Energy dynamics
-        x_pos = x_rd(2*m-1,i-1);
-        y_pos = x_rd(2*m,i-1);
-        % charging(m,i) = if_else((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= charger_r^2, 1, 0);
-        % e_full(m,i-1) = if_else(e(m,i-1) >= 1-charge_rate*Ts, 1, 0);
+        x_pos = x_rd(2*m-1,i);
+        y_pos = x_rd(2*m,i);
+        charging(m,i) = if_else((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= charger_r^2, 1, 0);
+        e_full(m,i-1) = if_else(e(m,i-1) >= 1-charge_rate*Ts, 1, 0);
         %opti.subject_to(e(m,i) == e(m,i-1) - (1-charging(m,i-1))*power(sqrt(x_vel^2 + y_vel^2))*Ts + charging(m,i-1)*(1-e_full(m,i-1))*charge_rate*Ts);
-        opti.subject_to(e(m,i) == e(m,i-1) + power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2))*Ts);
-
+        opti.subject_to(e(m,i) == e(m,i-1) - (1-charging(m,i))*power*Ts + charging(m,i)*(1-e_full(m,i-1))*charge_rate*Ts);
         opti.subject_to(0 <= e(m,i));   % Energy must not go under 0
         opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
 
         % Energy constaints (barrier)
         x_pos = x_rd(2*m-1,i);
         y_pos = x_rd(2*m,i);
-        barrier_dist = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+        barrier_dist = vmax*(e(m,i)/power); % Distance that robot m can get by going full speed in one direction
         opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 < barrier_dist^2);
     end
     % % Energy constraints
