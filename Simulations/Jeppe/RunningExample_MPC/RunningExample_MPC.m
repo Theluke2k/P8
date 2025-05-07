@@ -4,7 +4,7 @@ addpath('C:\Program Files\MATLAB/casadi-3.7.0-windows64-matlab2018b')
 %% Process simulation parameters
 N = 3;                  % Number of robots
 dt = 0.5;               % Time step [s]
-sim_time = 10;          % Simulation time [s]
+sim_time = 50;          % Simulation time [s]
 T = sim_time/dt;        % Total # of simulation steps
 Ts = 1;                 % MPC sampling time
 sim_params = [Ts, dt];
@@ -59,8 +59,16 @@ for j = 1:N
     X0(2*j-1) = xs_ref + j;
     X0(2*j) = ys_ref;
 end
+X0(1:2) = [10; 10];
 Uprev = zeros(2*N,1);           % (2*N values again)
+%E0 = ones(N,1); %initial energy level
+E0 = [0.3 0.8 0.8];
 
+% Charging parameters
+charger_x = 5;
+charger_y = 5;
+charger = [charger_x charger_y];
+charger_eps = 3;
 
 %% Dynamic parameter model
 tau_beta = 0.998;       %spread increase parameter (exponential decay of beta)
@@ -94,7 +102,7 @@ G = [0.5*dt^2 0 0 0;
     0 0 dt 0;
     0 0 0 0.5*dt^2;
     0 0 0 dt];
-sigma_M = 0.5; sigma_beta = 0.001; sigma_x = 0.2; sigma_y = 0.2;
+sigma_M = 0.5; sigma_beta = 0.001; sigma_x = 0.05; sigma_y = 0.05;
 sigma = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(sigma),1);
 Q = G*diag([sigma_M sigma_beta sigma_x sigma_y])*G';
@@ -131,11 +139,11 @@ pos_store = zeros(T,2,N);
 %% Simulation loop
 x_opt = X0;
 u_opt = Uprev;
+e_opt = E0;
 % rob_init = [x_opt, u_opt];
 
 H = zeros(N,size(z,1)); % Initialize linearized H matrix
 for n=1:T
-    disp("")
     % Simulate true process
     w = G*normrnd(mu_w,sigma);
     z(:,n+1) = A*z(:,n) + B*u(:,n) + w;
@@ -172,9 +180,12 @@ for n=1:T
     
     kf_init = [z_pred, P_pred];
     rob_init = [x_opt, u_opt];
-    [X_opt, U_opt, P_trace] = MPC_func(rob_init, kf_init, mpc_params, cost_params, N, map_bounds, min_dist, sim_params, 3);
+    e_init = e_opt;
+    [X_opt, U_opt, E_opt, P_trace] = MPC_func(rob_init, e_init, kf_init, mpc_params, cost_params, N, map_bounds, min_dist, sim_params, 3);
     u_opt = U_opt(:,2);
     x_opt = X_opt(:,2);
+    e_opt = E_opt(:,2);
+
 end
 
 %% Plots 
@@ -209,6 +220,7 @@ for i = 1:T
         pos = pos_store(i,:,j); % drone position at step i
         plot(pos(1), pos(2), 'ko', 'MarkerFaceColor','w', 'MarkerSize',10);
     end
+    viscircles(charger, charger_eps)
     hold off;
     set(gca,'YDir','normal');
     %caxis([I_min I_max]); 
@@ -259,6 +271,7 @@ for j = 1:N
     plot(pos_store(1,1,j), pos_store(1,2,j), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off');
     plot(pos_store(end,1,j), pos_store(end,2,j), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off');
 end
+viscircles(charger,charger_eps)
 hold off;
 legend;
 xlabel("x");
