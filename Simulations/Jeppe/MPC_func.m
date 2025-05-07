@@ -88,7 +88,7 @@ opti = Opti();
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
 x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 charging = opti.variable(M,Hp+1);       % Binary variable to track whether the robot is charging
-e = opti.variable(M,Hp+1);              % Energy of robot
+%e = opti.variable(M,Hp+1);              % Energy of robot
 e_full = opti.variable(M,Hp+1);
 %x_rd = MX.zeros(M*Nx_r + M*Nu_r,Hp+1);
 
@@ -104,7 +104,7 @@ p = MX.zeros(Nx_p,Hp+1);              % KF error covariance diagonal elements
 
 % Enforce initial conditions
 opti.subject_to(x_rd(:,1) == x0);
-opti.subject_to(e(:,1) == e0);  % Initial energy of robots
+%opti.subject_to(e(:,1) == e0);  % Initial energy of robots
 z_est(:,1) = z_est_0;
 P(:,1:Nx_p) = P_0;
 
@@ -178,21 +178,20 @@ for i = 1:Hp
     cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
 end
 
-% % Single shot energy constraints
-% charging = MX.zeros(M,Hp+1);       % Binary variable to track whether the robot is charging
-% e = MX.zeros(M,Hp+1);              % Energy of robot
-% e_full = MX.zeros(M,Hp+1);
-% for i = 2:Hp+1
-%     x_pos = x_rd(2*m-1,i-1);
-%     y_pos = x_rd(2*m,i-1);
-% end
+
 
 power_cons = @(v) 0.0001*v^2 + 0.05;
 
 % Constraints
+barrier_dist = MX.zeros(M,Hp+1);
+barrier_dist(:,1) = MX.ones(M,1)*100;
+powers = MX.zeros(M,Hp+1);
+robot_dist = MX.zeros(M,Hp+1);
+e = MX.zeros(M,Hp+1);              % Energy of robot
+e(:,1) = e0;
 for i = 2:Hp+1
     % Robot dynamics
-    if i <= Hu
+    if i <= Hu+1
         opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1) + B_rd*du(:,i-1));
     else
         opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1)); % DU(k > Hu) = 0
@@ -224,10 +223,13 @@ for i = 2:Hp+1
         % Energy dynamics
         x_pos = x_rd(2*m-1,i-1);
         y_pos = x_rd(2*m,i-1);
+        powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
+        e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
         % charging(m,i) = if_else((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= charger_r^2, 1, 0);
         % e_full(m,i-1) = if_else(e(m,i-1) >= 1-charge_rate*Ts, 1, 0);
         %opti.subject_to(e(m,i) == e(m,i-1) - (1-charging(m,i-1))*power(sqrt(x_vel^2 + y_vel^2))*Ts + charging(m,i-1)*(1-e_full(m,i-1))*charge_rate*Ts);
-        opti.subject_to(e(m,i) == e(m,i-1) + power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2))*Ts);
+        %powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
+        %opti.subject_to(e(m,i) == e(m,i-1) + powers(m,i-1)*Ts);
 
         opti.subject_to(0 <= e(m,i));   % Energy must not go under 0
         opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
@@ -235,25 +237,16 @@ for i = 2:Hp+1
         % Energy constaints (barrier)
         x_pos = x_rd(2*m-1,i);
         y_pos = x_rd(2*m,i);
-        barrier_dist = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 < barrier_dist^2);
+        robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+        barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax) - Ts); % Distance that robot m can get by going full speed in one direction
+        opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 < barrier_dist(m,i)^2);
     end
-    % % Energy constraints
-    % cost_slack = 0;
-    % for m =1:M
-    %     barrier_dist = vmax*e(m,i+1)/power(vmax);
-    %     %opti.subject_to((Za(4*(m-1) + 1,i+1) - charger_x)^2 + (Za(4*(m-1) + 2,i+1) - charger_y)^2 < barrier_dist^2 + e_slack(m,i));
-    %     %opti.subject_to(e_slack(m,i)>=0);
-    %     opti.subject_to(0 <= e(m,i+1));
-    %     opti.subject_to(e(m,i+1) <= 1);
-    %     %cost_slack = cost_slack + e_slack(m,i);
-    % end
 end
 
 % Define MPC 'object'
 opti.minimize(cost + cost_KF);
 solver_opts = struct();
-solver_opts.ipopt.max_iter = 2000;
+solver_opts.ipopt.max_iter = 5000;
 solver_opts.ipopt.tol = 1e-3;
 solver_opts.ipopt.print_level = verbose_opt;
 solver_opts.print_time = false;
@@ -270,6 +263,7 @@ try
 catch
     disp("MPC FAILED!!! :((((")
     debug = opti.debug
+    disp()
 end
 
 % Outputs

@@ -13,7 +13,7 @@ error_cv_selec = [1,3,5,7];
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
-Hu = 3;             % Control horizon
+Hu = 6;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 5;                  % Minimum distance between robots
@@ -37,10 +37,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 500;
+M_0 = 1000;
 beta_0 = 0.05;
-xs_0 = 10;
-ys_0 = 10;
+xs_0 = 20;
+ys_0 = 20;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -61,8 +61,8 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 0;
-    x_1(2*m) = 0;
+    x_1(2*m-1) = 1;
+    x_1(2*m) = 1;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
@@ -195,14 +195,14 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1);     % Robots fully charged at time 0
+e(:,1) = ones(M,1)*0.5;     % Robots fully charged at time 0
 charging = zeros(M,K+1);
 e_full = zeros(M,K+1);
 
 % Energy dynamics
 t1 = 2;
 o1 = 5;
-charge_rate = 0.02;
+charge_rate = 0.2;
 power = @(x,y,v) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
 %power = @(v) 0.0001*v^2 + 0.05;
 %power = 0.05;
@@ -338,7 +338,7 @@ for k=2:K+1
         %     e_full(m,k-1) = 0;
         % end
         % Compute new energy
-        e(m,k) = e(m,k-1) + power(x(2*m-1),x(2*m),sqrt(u_opt(2*m-1)^2 + u_opt(2*m)^2))*dt;
+        e(m,k) = e(m,k-1) + power(x(2*m-1,k),x(2*m,k),sqrt(u_opt(2*m-1)^2 + u_opt(2*m)^2))*dt;
     end
     %disp(e(:,k));
 
