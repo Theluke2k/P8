@@ -34,7 +34,7 @@ opts.ipopt.print_level = false;
 % Choose the ipopt solver
 opti.solver('ipopt', opts);
 
-sol = opti.solve();
+sol = opti.solve()
 
 sol.value(z)
 sol.value(x)

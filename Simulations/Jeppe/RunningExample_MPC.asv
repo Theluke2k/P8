@@ -12,8 +12,8 @@ state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 
 % MPC parameters
-Hp = 6;             % Prediction horizon
-Hu = 6;             % Control horizon
+Hp = 3;             % Prediction horizon
+Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 5;                  % Minimum distance between robots
@@ -25,7 +25,7 @@ zmin = 0; zmax = 20;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
-M_ref = 200;
+M_ref = 1000;
 beta_ref = 0.05;
 xs_ref = 20;
 ys_ref = 20;
@@ -37,7 +37,7 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 200;
+M_0 = 1000;
 beta_0 = 0.05;
 xs_0 = 20;
 ys_0 = 20;
@@ -73,7 +73,7 @@ tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
 Nu_p = 2;
 beta0 = 0.001; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
-u_M = 1; % Leakage rate offset
+u_M = 10; % Leakage rate offset
 u = ones(Nu_p,K+Hp+1);
 u(1,:) = u(1,:)*u_M;
 u(2,:) = u(2,:)*u_beta;
@@ -245,7 +245,7 @@ process_plot_est = gobjects(1,1);
 
 % Initial process plot setup
 figure(1)
-set(gcf, 'Position',  [100, 300, 1400, 400])
+set(gcf, 'Position',  [100, 200, 1200, 500])
 %  True process plot
 subplot(1,3,1)
 hold on;
@@ -365,11 +365,14 @@ for k=2:K+1
     EN_params = {e(:,k), power, charge_rate, charger_x, charger_y, charger_r};
     
     % Compute optimal stuff
-    %disp(x(:,k));
-    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
+    disp(x(:,k));
+    if(do_warm_start)
+    else
+        do_warm
+    end
+    [X_opt, U_opt, P_trace] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2);
     u_opt = U_opt(:,2);
-    % % %x(:,k+1) = X_opt(:,2);
-    do_warm_start = 1; % set warm start to 1 after first iteration
+    %x(:,k+1) = X_opt(:,2);
 
     % Update process plot
     %subplot(1,2,1)

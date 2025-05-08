@@ -88,8 +88,8 @@ opti = casadi.Opti();
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
 x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 b_slack = opti.variable(M,Hp+1);
-e_low_slack = opti.variable(M,Hp+1);
-e_high_slack = opti.variable(M,Hp+1);
+e_low_slack =
+
 
 % States and varialbes (NOT to be optimized over)
 z_est = MX.zeros(Nx_p,Hp+1);          % Kalman filter states
@@ -213,27 +213,23 @@ for i = 2:Hp+1
         opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
         opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
 
-        % % Energy constaints (barrier)
-        % x_pos = x_rd(2*m-1,i);
-        % y_pos = x_rd(2*m,i);
-        % robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-        % barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        % opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
+        % Energy constaints (barrier)
+        x_pos = x_rd(2*m-1,i);
+        y_pos = x_rd(2*m,i);
+        robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+        barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+        opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        cost_slack = cost_slack + b_slack(m,i);
 
         % Slack constraints
         opti.subject_to(b_slack(m,i) >= 0);
-        opti.subject_to(e_low_slack(m,i) >= 0);
-        opti.subject_to(e_high_slack(m,i) >= 0);
     end
 end
 
-opti.set_initial(b_slack, ones(M,Hp+1));
-opti.set_initial(e_low_slack, ones(M,Hp+1));
-opti.set_initial(e_high_slack, ones(M,Hp+1));
+
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF + 100000*cost_slack);
+opti.minimize(cost + cost_KF + cost_slack);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
@@ -256,14 +252,10 @@ try
     sol = opti.solve();
     sol.value(x_rd);
     sol.value(e)
-    % sol.value(opti.f())
-    % sol.stats.iter_count
-    fprintf("Objective: %.2f\n", sol.value(opti.f()))
-    fprintf("Iterations: %d\n", sol.stats.iter_count)
 catch
     disp("MPC FAILED!!! :((((")
     debug = opti.debug
-    disp("")
+    disp()
 end
 
 % Outputs
