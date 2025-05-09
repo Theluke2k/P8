@@ -8,8 +8,11 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [1];            % Select states to plot
+state_plot_selec = [5];            % Select states to plot
 error_cv_selec = [1,3,5,7];
+
+% random seed
+rng(50)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
@@ -21,7 +24,7 @@ min_dist = 5;                  % Minimum distance between robots
 % Map bounderies
 xmin = 0; xmax = 40;
 ymin = 0; ymax = 40;
-zmin = 0; zmax = 20;
+zmin = 0; zmax = 5;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
@@ -49,10 +52,10 @@ z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % 
 
 % Initial error covariance matrix
 P_0 = zeros(Nx_p);
-P_0(1,1) = (M_ref - M_0)^2;
-P_0(3,3) = (beta_ref - beta_0)^2;
-P_0(5,5) = (xs_ref - xs_0)^2;
-P_0(7,7) = (ys_ref - ys_0)^2;
+% P_0(1,1) = (M_ref - M_0)^2;
+% P_0(3,3) = (beta_ref - beta_0)^2;
+% P_0(5,5) = (xs_ref - xs_0)^2;
+% P_0(7,7) = (ys_ref - ys_0)^2;
 % P_0(1,1) = 1;
 % P_0(5,5) = 1;
 % P_0(7,7) = 1;
@@ -174,10 +177,10 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 %      0 0 0 0 0 k_xsdot 0 0;
 %      0 0 0 0 0 0 k_ys 0;
 %      0 0 0 0 0 0 0 k_ysdot];
-scaling = [1 1 1 1 1 1 1 1]';
-T = diag(scaling)
-
-A_inv(T)*A*T
+% scaling = [1 1 1 1 1 1 1 1]';
+% T = diag(scaling)
+% 
+% A_inv(T)*A*T
 
 % Everyting recomputed for the MPC
 A_MPC = A_func(Ts);
@@ -366,6 +369,9 @@ for k=2:K+1
     y(:,k) = get_h_vec(z(:,k), x(:,k), M) + r;
     
     % Run Kalman filter iteration
+    if k==180
+        disp("")
+    end
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, x(:,k));
    
     % Package all Kalman filter information for MPC
@@ -381,10 +387,10 @@ for k=2:K+1
     
     % Compute optimal stuff
     %disp(x(:,k));
-    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
-    u_opt = U_opt(:,2);
-    % % %x(:,k+1) = X_opt(:,2);
-    do_warm_start = 1; % set warm start to 1 after first iteration
+    % [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
+    % u_opt = U_opt(:,2);
+    % % % %x(:,k+1) = X_opt(:,2);
+    % do_warm_start = 1; % set warm start to 1 after first iteration
 
     % Update process plot
     %subplot(1,2,1)

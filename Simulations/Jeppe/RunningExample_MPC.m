@@ -8,7 +8,7 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [1];            % Select states to plot
+state_plot_selec = [5];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 
 % random seed
@@ -154,7 +154,7 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 
 % %TESTING
 % H(z_0,x_1,M)
-% get_H_jaco(z_0,x_1,M)
+get_H_jaco(z_0,[21, 21, 21, 21, 21, 21],M)
 % H = zeros(M,Nx_p);
 % for m=1:M
 %     x_pos = x_1(2*m-1);
@@ -369,6 +369,9 @@ for k=2:K+1
     y(:,k) = get_h_vec(z(:,k), x(:,k), M) + r;
     
     % Run Kalman filter iteration
+    if k==180
+        disp("")
+    end
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, x(:,k));
    
     % Package all Kalman filter information for MPC
