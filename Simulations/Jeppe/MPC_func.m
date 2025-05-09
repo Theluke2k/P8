@@ -158,7 +158,7 @@ for i = 2:Hp+1
     P(:,(i-1)*Nx_p+1:i*Nx_p) = P_hat - K*H*P_hat;
     
     % Define p as the diagonal elements of P
-    p(:,i) = T*diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
+    p(:,i) = diag(T*P(:,(i-1)*Nx_p+1:i*Nx_p)*T');
 
     % Collection :)
     z_hat_dum(:,i) = z_hat;
