@@ -10,9 +10,11 @@ Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [1 1 1 1 1 1 1 1]';        % Scaling
+sc = [2 2 2 2 2 2 2 2]';        % Scaling
 T = diag(sc);
 
+% Random seed
+rng(50)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
@@ -120,7 +122,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 1; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
+sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
