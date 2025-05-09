@@ -52,10 +52,10 @@ z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % 
 
 % Initial error covariance matrix
 P_0 = zeros(Nx_p);
-P_0(1,1) = (M_ref - M_0)^2;
-P_0(3,3) = (beta_ref - beta_0)^2;
-P_0(5,5) = (xs_ref - xs_0)^2;
-P_0(7,7) = (ys_ref - ys_0)^2;
+% P_0(1,1) = (M_ref - M_0)^2;
+% P_0(3,3) = (beta_ref - beta_0)^2;
+% P_0(5,5) = (xs_ref - xs_0)^2;
+% P_0(7,7) = (ys_ref - ys_0)^2;
 % P_0(1,1) = 1;
 % P_0(5,5) = 1;
 % P_0(7,7) = 1;
