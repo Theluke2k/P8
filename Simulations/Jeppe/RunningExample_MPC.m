@@ -8,9 +8,10 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [5];            % Select states to plot
+state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [1 1 1 1 1 1 1 1]';        % Scaling
+%sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
@@ -185,7 +186,10 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 % Everyting recomputed for the MPC
 A_MPC = A_func(Ts);
 B_MPC = B_func(Ts);
-Q_MPC = (inv(T)*G_func(Ts))*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G_func(Ts))';
+Q_MPC = G_func(Ts)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G_func(Ts)';
+Q_MPC_sc = (inv(T)*G_func(Ts))*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G_func(Ts))';
+A_MPC_sc = inv(T)*A_MPC*T;  % Scaled
+B_MPC_sc = inv(T)*B_MPC;    % Scaled
 
 %% Robot State Space Model
 % Integrator
@@ -309,8 +313,8 @@ subplot(1,3,3)
 hold on
 for i = 1:length(state_plot_selec)
     s = state_plot_selec(i);
-    z_selected(i,1) = z(s,1);   % Plug in initial states as first column
-    z_est_selected(i,1) = z_est(s,1);   % Plug in initial guessed states as first column
+    z_selected(i,1) = T(s,s)*z(s,1);   % Plug in initial states as first column
+    z_est_selected(i,1) = T(s,s)*z_est(s,1);   % Plug in initial guessed states as first column
     z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors{i});
     z_est_selected_plot(i) = plot(0,z_est_selected(1,1),'DisplayName',sprintf('State %d est.', s),'Color',colors{i},'LineStyle','--');
 end
@@ -382,7 +386,7 @@ for k=2:K+1
     % Package all Kalman filter information for MPC
     u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
     u_mpc(2,:) = u_mpc(2,:)*(dt/Ts);    % Scale input to match MPC sampling period
-    KF_params = {z_est(:,k), P(:,:,k), A_MPC, B_MPC, u_mpc, Q_MPC, R, error_cv_selec};
+    KF_params = {z_est(:,k), P(:,:,k), A_MPC_sc, B_MPC_sc, u_mpc, Q_MPC_sc, R, error_cv_selec};
 
     % Package all robot information
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
@@ -390,12 +394,12 @@ for k=2:K+1
     % Package energy information
     EN_params = {e(:,k), power, charge_rate, charger_x, charger_y, charger_r};
     
-    % % Compute optimal stuff
-    % %disp(x(:,k));
-    % [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
-    % u_opt = U_opt(:,2);
-    % % % %x(:,k+1) = X_opt(:,2);
-    % do_warm_start = 1; % set warm start to 1 after first iteration
+    % Compute optimal stuff
+    %disp(x(:,k));
+    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
+    u_opt = U_opt(:,2);
+    %x(:,k+1) = X_opt(:,2);
+    do_warm_start = 1; % set warm start to 1 after first iteration
 
     % Update process plot
     %subplot(1,2,1)

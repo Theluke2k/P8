@@ -22,7 +22,7 @@ function [x,P, x_hat] = EKF(x_prev,P_prev,A_prev,B_prev,u_prev,Q_prev, y, R, pos
 
     % PREPROCESSING
     M = length(y);
-    H_x = get_H_jaco(x_hat,pos_rob,M,sc)
+    H_x = get_H_jaco(x_hat,pos_rob,M,sc);
 
     % UPDATE STEP
     v = y - get_h_vec(x_hat, pos_rob,M,sc);

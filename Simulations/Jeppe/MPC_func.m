@@ -1,4 +1,4 @@
-function [X_opt,U_opt,P_trace, sol] = MPC_func(rob_init, kf_init, en_params, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev)
+function [X_opt,U_opt,P_trace, sol] = MPC_func(rob_init, kf_init, en_params, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev, sc)
 %% Parameters
 import casadi.*
 
@@ -20,6 +20,9 @@ eps = cost_params(3); % Regularization parameter
 % Simulation parameters
 Ts = sim_params(1); % MPC sampling time
 dt = sim_params(2); % Simulation sampling time
+
+% Scaling
+T = diag(sc);
 
 % MISC
 M = n_robots; % Number of robots
@@ -141,13 +144,13 @@ for i = 2:Hp+1
     % PREPROCESSING
     for m = 1:M
         % Get expected robot measurements with predicted states
-        h_vec(m) = get_h(z_hat,x_rd(2*m-1,i),x_rd(2*m,i));
+        h_vec(m) = get_h(z_hat,x_rd(2*m-1,i),x_rd(2*m,i),sc);
 
         % Compute Jacobian
         H(m,1) = h_vec(m) / z_hat(1);
-        H(m,3) = h_vec(m) * (1/z_hat(3) - ((x_rd(2*m-1,i) - z_hat(5))^2 + (x_rd(2*m,i) - z_hat(7))^2));
-        H(m,5) = h_vec(m) * (-2*z_hat(3)*(z_hat(5) - x_rd(2*m-1,i)));
-        H(m,7) = h_vec(m) * (-2*z_hat(3)*(z_hat(7) - x_rd(2*m,i)));
+        H(m,3) = h_vec(m) * (1/z_hat(3) - sc(3)*((x_rd(2*m-1,i) - sc(5)*z_hat(5))^2 + (x_rd(2*m,i) - sc(7)*z_hat(7))^2));
+        H(m,5) = h_vec(m) * (-2*sc(5)*sc(3)*z_hat(3)*(sc(5)*z_hat(5) - x_rd(2*m-1,i)));
+        H(m,7) = h_vec(m) * (-2*sc(7)*sc(3)*z_hat(3)*(sc(7)*z_hat(7) - x_rd(2*m,i)));
     end
     
     % UPDATE STEP
@@ -155,7 +158,7 @@ for i = 2:Hp+1
     P(:,(i-1)*Nx_p+1:i*Nx_p) = P_hat - K*H*P_hat;
     
     % Define p as the diagonal elements of P
-    p(:,i) = diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
+    p(:,i) = T*diag(P(:,(i-1)*Nx_p+1:i*Nx_p));
 
     % Collection :)
     z_hat_dum(:,i) = z_hat;
@@ -205,25 +208,25 @@ for i = 2:Hp+1
         opti.subject_to(ymin <= x_rd(2*m,i));
         opti.subject_to(ymax >= x_rd(2*m,i));
 
-        % Energy dynamics
-        x_pos = x_rd(2*m-1,i-1);
-        y_pos = x_rd(2*m,i-1);
-        powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
-        e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
-
-        % General energy constraints
-        opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
-        opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
-
-        % Energy constaints (barrier)
-        if(i == Hp+1)
-            x_pos = x_rd(2*m-1,i);
-            y_pos = x_rd(2*m,i);
-            robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-            barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-            opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        end
-        cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
+        % % Energy dynamics
+        % x_pos = x_rd(2*m-1,i-1);
+        % y_pos = x_rd(2*m,i-1);
+        % powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
+        % e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
+        % 
+        % % General energy constraints
+        % opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
+        % opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
+        % 
+        % % Energy constaints (barrier)
+        % if(i == Hp+1)
+        %     x_pos = x_rd(2*m-1,i);
+        %     y_pos = x_rd(2*m,i);
+        %     robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+        %     barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        % end
+        % cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
         % Slack constraints
         opti.subject_to(b_slack(m,i) >= 0);
