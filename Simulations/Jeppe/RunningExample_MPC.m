@@ -8,7 +8,7 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [1];            % Select states to plot
+state_plot_selec = [5];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 sc = [1 1 1 1 1 1 1 1]';        % Scaling
 T = diag(sc);
@@ -158,7 +158,7 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 
 % %TESTING
 % H(z_0,x_1,M)
-% get_H_jaco(z_0,x_1,M)
+%get_H_jaco(z,x_1,M,sc)
 % H = zeros(M,Nx_p);
 % for m=1:M
 %     x_pos = x_1(2*m-1);
@@ -247,6 +247,8 @@ z_est(:,1) = inv(T)*z_est_0;
 x(:,1) = x_1;
 x(:,2) = x_1;
 P(:,:,1) = P_0;
+
+get_H_jaco(z(:,1),[21;21;21;21;21;21],M,sc)
 
 %% Plotting preparation
 % Initializations
@@ -338,9 +340,12 @@ z_hat(:,1) = z_est(:,1);
 sol_prev = 0;
 do_warm_start = 0;
 
+z_real = zeros(Nx_p,K+1);
+z_est_real = zeros(Nx_p,K+1);
+
 for k=2:K+1
     % Update true process
-    w = G*normrnd(mu_w,v);
+    w = (inv(T)*G)*normrnd(mu_w,v);
     z(:,k) = A_sc*z(:,k-1) + B_sc*u(:,k-1) + w;
     
     % Update robot positions
@@ -369,6 +374,9 @@ for k=2:K+1
     y(:,k) = get_h_vec(z(:,k), x(:,k), M, sc) + r;
     
     % Run Kalman filter iteration
+    if(k ==180)
+        disp("")
+    end
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A_sc, B_sc, u(:,k-1), Q, y(:,k), R, x(:,k), sc);
    
     % Package all Kalman filter information for MPC
@@ -403,10 +411,12 @@ for k=2:K+1
     end
     
     %update state and estimate plot
+    z_real(:,k) = T*z(:,k);
+    z_est_real(:,k) = T*z_est(:,k);
     for i = 1:length(state_plot_selec)
         s = state_plot_selec(i);
-        z_selected(i,k) = z(s,k);
-        z_est_selected(i,k) = z_est(s,k);
+        z_selected(i,k) = z_real(s,k);
+        z_est_selected(i,k) = z_est_real(s,k);
         set(z_selected_plot(i), 'XData', t_vec(1:k),'YData', z_selected(i,1:k))
         set(z_est_selected_plot(i), 'XData', t_vec(1:k), 'YData', z_est_selected(i,1:k))
     end
