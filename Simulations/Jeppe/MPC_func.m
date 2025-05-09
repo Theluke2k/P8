@@ -6,7 +6,7 @@ import casadi.*
 xmin = map_bounds(1); xmax = map_bounds(2);
 ymin = map_bounds(3); ymax = map_bounds(4);
 dmin = min_dist;
-vmax = 20;
+vmax = 2;
 
 % MPC parameters
 Hp = mpc_params(1); % Prediction horizon
@@ -41,12 +41,13 @@ Nu_p = size(B_p,2);       % Number of inputs in process model
 
 %% Robot model and Tuning
 % Tuning for a single robot
-Q = eye(Nx_p);
-Q(1,1) = (20/500)^2;
-Q(2,2) = 0;
-Q(4,4) = 0;
-Q(6,6) = 0;
-Q(8,8) = 0;
+% Q = eye(Nx_p);
+% %Q(1,1) = (20/500)^2;
+% Q(2,2) = 0;
+% Q(4,4) = 0;
+% Q(6,6) = 0;
+% Q(8,8) = 0;
+Q_vec = [1;0;1;0;1;0;1;0];
 R_single = [0 0;
      0 0];
 
@@ -150,7 +151,7 @@ for i = 2:Hp+1
     end
     
     % UPDATE STEP
-    K = (P_hat*H') / (H*P_hat*H' + R_p);
+    K = (P_hat*H')*inv(H*P_hat*H' + R_p);
     P(:,(i-1)*Nx_p+1:i*Nx_p) = P_hat - K*H*P_hat;
     
     % Define p as the diagonal elements of P
@@ -167,8 +168,9 @@ end
 % Now that p has been defined in terms of the robot positions, we can write
 % up the cost
 cost_KF = 0;
-for i = 1:Hp
-    cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
+for i = 2:Hp+1
+    %cost_KF = cost_KF + p(:,i)'*Q*p(:,i);
+    cost_KF = cost_KF + p(:,i)'*Q_vec;
 end
 
 
@@ -208,19 +210,21 @@ for i = 2:Hp+1
         y_pos = x_rd(2*m,i-1);
         powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
         e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
-        
+
         % General energy constraints
         opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
         opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
 
-        % % Energy constaints (barrier)
-        % x_pos = x_rd(2*m-1,i);
-        % y_pos = x_rd(2*m,i);
-        % robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-        % barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        % opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        % Energy constaints (barrier)
+        if(i == Hp+1)
+            x_pos = x_rd(2*m-1,i);
+            y_pos = x_rd(2*m,i);
+            robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+            barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+            opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        end
         cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
-
+        
         % Slack constraints
         opti.subject_to(b_slack(m,i) >= 0);
         opti.subject_to(e_low_slack(m,i) >= 0);
@@ -233,7 +237,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF + 100000*cost_slack);
+opti.minimize(cost + cost_KF/1000 + 1000*cost_slack);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
@@ -256,6 +260,7 @@ try
     sol = opti.solve();
     sol.value(x_rd);
     sol.value(e)
+    %sol.value(p)
     % sol.value(opti.f())
     % sol.stats.iter_count
     fprintf("Objective: %.2f\n", sol.value(opti.f()))

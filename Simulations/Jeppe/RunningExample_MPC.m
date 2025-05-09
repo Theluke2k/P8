@@ -6,14 +6,14 @@ M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
 sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
-Ts = 1;                 % MPC sampling period
+Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
-Hu = 6;             % Control horizon
+Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 5;                  % Minimum distance between robots
@@ -21,7 +21,7 @@ min_dist = 5;                  % Minimum distance between robots
 % Map bounderies
 xmin = 0; xmax = 40;
 ymin = 0; ymax = 40;
-zmin = 0; zmax = 20;
+zmin = 0; zmax = 5;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
@@ -37,10 +37,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 200;
+M_0 = 50;
 beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+xs_0 = 10;
+ys_0 = 10;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -73,7 +73,7 @@ tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
 Nu_p = 2;
 beta0 = 0.001; %steady-state value for beta
 u_beta = beta0*(1-tau_beta)/dt; % constant input to achieve beta0 in steady-state
-u_M = 1; % Leakage rate offset
+u_M = 5; % Leakage rate offset
 u = ones(Nu_p,K+Hp+1);
 u(1,:) = u(1,:)*u_M;
 u(2,:) = u(2,:)*u_beta;
@@ -163,6 +163,21 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 %     H(m,7) = -2*y*z_0(3)*(z_0(7)-y_pos);
 % end
 % H
+
+% Transformation for scaling
+% syms k_M k_Mdot k_beta k_betadot k_xs k_xsdot k_ys k_ysdot real
+% T = [k_M 0 0 0 0 0 0 0;
+%      0 k_Mdot 0 0 0 0 0 0;
+%      0 0 k_beta 0 0 0 0 0;
+%      0 0 0 k_betadot 0 0 0 0;
+%      0 0 0 0 k_xs 0 0 0;
+%      0 0 0 0 0 k_xsdot 0 0;
+%      0 0 0 0 0 0 k_ys 0;
+%      0 0 0 0 0 0 0 k_ysdot];
+% scaling = [1 1 1 1 1 1 1 1]';
+% T = diag(scaling)
+% 
+% A_inv(T)*A*T
 
 % Everyting recomputed for the MPC
 A_MPC = A_func(Ts);
