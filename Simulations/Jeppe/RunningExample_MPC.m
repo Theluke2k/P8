@@ -10,7 +10,7 @@ Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [2 2 2 2 2 2 2 2]';        % Scaling
+sc = [1 1 1 1 1 1 1 1]';        % Scaling
 T = diag(sc);
 
 % Random seed
