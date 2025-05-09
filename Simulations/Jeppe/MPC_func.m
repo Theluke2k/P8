@@ -205,25 +205,25 @@ for i = 2:Hp+1
         opti.subject_to(ymin <= x_rd(2*m,i));
         opti.subject_to(ymax >= x_rd(2*m,i));
 
-        % Energy dynamics
-        x_pos = x_rd(2*m-1,i-1);
-        y_pos = x_rd(2*m,i-1);
-        powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
-        e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
-
-        % General energy constraints
-        opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
-        opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
-
-        % Energy constaints (barrier)
-        if(i == Hp+1)
-            x_pos = x_rd(2*m-1,i);
-            y_pos = x_rd(2*m,i);
-            robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-            barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-            opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        end
-        cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
+        % % Energy dynamics
+        % x_pos = x_rd(2*m-1,i-1);
+        % y_pos = x_rd(2*m,i-1);
+        % powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
+        % e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
+        % 
+        % % General energy constraints
+        % opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
+        % opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
+        % 
+        % % Energy constaints (barrier)
+        % if(i == Hp+1)
+        %     x_pos = x_rd(2*m-1,i);
+        %     y_pos = x_rd(2*m,i);
+        %     robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+        %     barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        % end
+        % cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
         % Slack constraints
         opti.subject_to(b_slack(m,i) >= 0);

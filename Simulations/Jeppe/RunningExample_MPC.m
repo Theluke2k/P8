@@ -8,7 +8,7 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [5];            % Select states to plot
+state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
 
 % random seed
@@ -387,10 +387,10 @@ for k=2:K+1
     
     % Compute optimal stuff
     %disp(x(:,k));
-    % [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
-    % u_opt = U_opt(:,2);
-    % % % %x(:,k+1) = X_opt(:,2);
-    % do_warm_start = 1; % set warm start to 1 after first iteration
+    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
+    u_opt = U_opt(:,2);
+    % % %x(:,k+1) = X_opt(:,2);
+    do_warm_start = 1; % set warm start to 1 after first iteration
 
     % Update process plot
     %subplot(1,2,1)
