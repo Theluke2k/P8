@@ -15,7 +15,7 @@ sc = [15 1 0.5 0.0001 10 0.1 10 0.1]';        % Scaling
 T = diag(sc);
 
 % Random seed
-rng(1000)
+% rng(1000)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
@@ -67,7 +67,7 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 0+(m-1);
+    x_1(2*m-1) = 0+(m-1)/100;
     x_1(2*m) = 0;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)

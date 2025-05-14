@@ -8,21 +8,21 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [1];            % Select states to plot
+state_plot_selec = [3];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+sc = [15 1 0.5 0.0001 10 0.1 10 0.1]';        % Scaling
 %sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
-%rng(50)
+% rng(1000)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
-min_dist = 5;                  % Minimum distance between robots
+min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 10;
@@ -43,10 +43,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 15;
-beta_0 = 0.5;
-xs_0 = 5;
-ys_0 = 5;
+M_0 = 5;
+beta_0 = 0.2;
+xs_0 = 7;
+ys_0 = 3;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -67,8 +67,8 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 1;
-    x_1(2*m) = 1;
+    x_1(2*m-1) = 0+(m-1)/100;
+    x_1(2*m) = 0;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
@@ -123,7 +123,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 0.5; sigma_beta = 0.00001; sigma_x = 0.005; sigma_y = 0.005;
+sigma_M = 0.1; sigma_beta = 0.001; sigma_x = 0.005; sigma_y = 0.005;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
@@ -290,18 +290,23 @@ ax1 = subplot(1,3,1); hold(ax1,'on');
 ax2 = subplot(1,3,2); hold(ax2,'on');
 
 % Create robot quivers (they are identical, but must be created twice to live in multiple plots)
-robot_quivers_true = gobjects(M,1);     
-robot_quivers_est = gobjects(M,1);
+robot_true = gobjects(M,1);     
+robot_est = gobjects(M,1);
 
 % Plot robots on process plot (with their inital conditions)
 subplot(1,3,1)
+thickness = 4;
 for m = 1:M
-    robot_quivers_true(m) = quiver(ax1,  x_1(2*m-1), x_1(2*m), ...
-                                 0.1, 0.1, 'Color', colors{m}, ...
-                                 'LineWidth',4,'MaxHeadSize',4);
-    robot_quivers_est(m)  = quiver(ax2,  x_1(2*m-1), x_1(2*m), ...
-                                 0.1, 0.1, 'Color', colors{m}, ...
-                                 'LineWidth',4,'MaxHeadSize',4);
+    robot_true(m) = plot(ax1, x_1(2*m-1), x_1(2*m), 'o', ...
+                                    'MarkerSize', thickness, ...
+                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerEdgeColor', 'k', ...
+                                    'LineWidth', 1);
+    robot_est(m) = plot(ax2, x_1(2*m-1), x_1(2*m), 'o', ...
+                                    'MarkerSize', thickness, ...
+                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerEdgeColor', 'k', ...
+                                    'LineWidth', 1);
 end
 
 % Plot selected states
@@ -410,8 +415,8 @@ for k=2:K+1
 
     % Update robot positions
     for m = 1:M
-        set(robot_quivers_true(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
-        set(robot_quivers_est(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
+        set(robot_true(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
+        set(robot_est(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
     end
     
     %update state and estimate plot
