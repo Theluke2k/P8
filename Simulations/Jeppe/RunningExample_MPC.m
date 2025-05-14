@@ -10,8 +10,11 @@ Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
+sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+%sc = [1 1 1 1 1 1 1 1]';
+T = diag(sc);
 
-% random seed
+% Random seed
 rng(50)
 
 % MPC parameters
@@ -102,6 +105,8 @@ B_func = @(dt) [dt 0;
 % Create system matrices with corresponding sampling periods
 A = A_func(dt);
 B = B_func(dt);
+A_sc = inv(T)*A*T;  % Scaled
+B_sc = inv(T)*B;    % Scaled
 
 % Process input matrix
 % B = zeros(Nx_p,2);
@@ -121,7 +126,7 @@ G = G_func(dt);
 sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
-Q = G*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G'; % This is the process noise covariance matrix
+Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
 
 % Measurement noise
 sigma_measurement = 0.1;
@@ -154,7 +159,7 @@ R = sigma_measurement^2*eye(M); % measurement noise covariance
 
 % %TESTING
 % H(z_0,x_1,M)
-get_H_jaco(z_0,[21, 21, 21, 21, 21, 21],M)
+%get_H_jaco(z,x_1,M,sc)
 % H = zeros(M,Nx_p);
 % for m=1:M
 %     x_pos = x_1(2*m-1);
@@ -177,15 +182,14 @@ get_H_jaco(z_0,[21, 21, 21, 21, 21, 21],M)
 %      0 0 0 0 0 k_xsdot 0 0;
 %      0 0 0 0 0 0 k_ys 0;
 %      0 0 0 0 0 0 0 k_ysdot];
-% scaling = [1 1 1 1 1 1 1 1]';
-% T = diag(scaling)
-% 
-% A_inv(T)*A*T
 
 % Everyting recomputed for the MPC
 A_MPC = A_func(Ts);
 B_MPC = B_func(Ts);
 Q_MPC = G_func(Ts)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*G_func(Ts)';
+Q_MPC_sc = (inv(T)*G_func(Ts))*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G_func(Ts))';
+A_MPC_sc = inv(T)*A_MPC*T;  % Scaled
+B_MPC_sc = inv(T)*B_MPC;    % Scaled
 
 %% Robot State Space Model
 % Integrator
@@ -242,18 +246,20 @@ P = zeros(Nx_p,Nx_p,K+1);         % Error covariance matrix
 y = zeros(M,K+1);           % Measurements of process
 
 % Put initial conditions into vectors
-z(:,1) = z_0;
-z_est(:,1) = z_est_0;
+z(:,1) = inv(T)*z_0;
+z_est(:,1) = inv(T)*z_est_0;
 x(:,1) = x_1;
 x(:,2) = x_1;
 P(:,:,1) = P_0;
+
+get_H_jaco(z(:,1),[21;21;21;21;21;21],M,sc)
 
 %% Plotting preparation
 % Initializations
 x_axis = linspace(xmin,xmax,50);    % Process x-axis
 y_axis = linspace(ymin,ymax,50)';   % Process y-axis
-z_values_true = get_h(z_0,x_axis,y_axis);    % Process values in defined area
-z_values_est = get_h(z_est_0, x_axis, y_axis);
+z_values_true = get_h(z(:,1),x_axis,y_axis,sc);    % Process values in defined area
+z_values_est = get_h(z_est(:,1), x_axis, y_axis,sc);
 t_vec = (0:K) * dt;               % Time vector for plotting
 colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
 
@@ -307,8 +313,8 @@ subplot(1,3,3)
 hold on
 for i = 1:length(state_plot_selec)
     s = state_plot_selec(i);
-    z_selected(i,1) = z_0(s);   % Plug in initial states as first column
-    z_est_selected(i,1) = z_est_0(s);   % Plug in initial guessed states as first column
+    z_selected(i,1) = T(s,s)*z(s,1);   % Plug in initial states as first column
+    z_est_selected(i,1) = T(s,s)*z_est(s,1);   % Plug in initial guessed states as first column
     z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors{i});
     z_est_selected_plot(i) = plot(0,z_est_selected(1,1),'DisplayName',sprintf('State %d est.', s),'Color',colors{i},'LineStyle','--');
 end
@@ -338,10 +344,13 @@ z_hat(:,1) = z_est(:,1);
 sol_prev = 0;
 do_warm_start = 0;
 
+z_real = zeros(Nx_p,K+1);
+z_est_real = zeros(Nx_p,K+1);
+
 for k=2:K+1
     % Update true process
-    w = G*normrnd(mu_w,v);
-    z(:,k) = A*z(:,k-1) + B*u(:,k-1) + w;
+    w = (inv(T)*G)*normrnd(mu_w,v);
+    z(:,k) = A_sc*z(:,k-1) + B_sc*u(:,k-1) + w;
     
     % Update robot positions
     x(:,k) = A_r*x(:,k-1) + B_r*u_opt;
@@ -366,18 +375,18 @@ for k=2:K+1
 
     % Take measurements
     r = mvnrnd(mu_r',R)';
-    y(:,k) = get_h_vec(z(:,k), x(:,k), M) + r;
+    y(:,k) = get_h_vec(z(:,k), x(:,k), M, sc) + r;
     
     % Run Kalman filter iteration
-    if k==180
+    if(k ==180)
         disp("")
     end
-    [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A, B, u(:,k-1), Q, y(:,k), R, x(:,k));
+    [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A_sc, B_sc, u(:,k-1), Q, y(:,k), R, x(:,k), sc);
    
     % Package all Kalman filter information for MPC
     u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
     u_mpc(2,:) = u_mpc(2,:)*(dt/Ts);    % Scale input to match MPC sampling period
-    KF_params = {z_est(:,k), P(:,:,k), A_MPC, B_MPC, u_mpc, Q_MPC, R, error_cv_selec};
+    KF_params = {z_est(:,k), P(:,:,k), A_MPC_sc, B_MPC_sc, u_mpc, Q_MPC_sc, R, error_cv_selec};
 
     % Package all robot information
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
@@ -387,15 +396,15 @@ for k=2:K+1
     
     % Compute optimal stuff
     %disp(x(:,k));
-    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev);
+    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
     u_opt = U_opt(:,2);
-    % % %x(:,k+1) = X_opt(:,2);
+    %x(:,k+1) = X_opt(:,2);
     do_warm_start = 1; % set warm start to 1 after first iteration
 
     % Update process plot
     %subplot(1,2,1)
-    z_values_true = get_h(z(:,k),x_axis,y_axis);
-    z_values_est = get_h(z_est(:,k),x_axis,y_axis);
+    z_values_true = get_h(z(:,k),x_axis,y_axis, sc);
+    z_values_est = get_h(z_est(:,k),x_axis,y_axis, sc);
     set(process_plot_true(1), 'XData', x_axis, 'YData', y_axis, 'ZData', z_values_true)
     set(process_plot_est(1), 'XData', x_axis, 'YData', y_axis, 'ZData', z_values_est)
 
@@ -406,10 +415,12 @@ for k=2:K+1
     end
     
     %update state and estimate plot
+    z_real(:,k) = T*z(:,k);
+    z_est_real(:,k) = T*z_est(:,k);
     for i = 1:length(state_plot_selec)
         s = state_plot_selec(i);
-        z_selected(i,k) = z(s,k);
-        z_est_selected(i,k) = z_est(s,k);
+        z_selected(i,k) = z_real(s,k);
+        z_est_selected(i,k) = z_est_real(s,k);
         set(z_selected_plot(i), 'XData', t_vec(1:k),'YData', z_selected(i,1:k))
         set(z_est_selected_plot(i), 'XData', t_vec(1:k), 'YData', z_est_selected(i,1:k))
     end
