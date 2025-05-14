@@ -6,7 +6,7 @@ import casadi.*
 xmin = map_bounds(1); xmax = map_bounds(2);
 ymin = map_bounds(3); ymax = map_bounds(4);
 dmin = min_dist;
-vmax = 2;
+vmax = 0.2;
 
 % MPC parameters
 Hp = mpc_params(1); % Prediction horizon
