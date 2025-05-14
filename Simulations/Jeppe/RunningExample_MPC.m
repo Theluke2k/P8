@@ -8,9 +8,9 @@ sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
-state_plot_selec = [1];            % Select states to plot
+state_plot_selec = [3];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+sc = [15 1 0.5 0.0001 10 0.1 10 0.1]';        % Scaling
 %sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
@@ -123,7 +123,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 0.5; sigma_beta = 0.00001; sigma_x = 0.005; sigma_y = 0.005;
+sigma_M = 0.1; sigma_beta = 0.001; sigma_x = 0.005; sigma_y = 0.005;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
@@ -295,7 +295,7 @@ robot_est = gobjects(M,1);
 
 % Plot robots on process plot (with their inital conditions)
 subplot(1,3,1)
-thickness = 7;
+thickness = 4;
 for m = 1:M
     robot_true(m) = plot(ax1, x_1(2*m-1), x_1(2*m), 'o', ...
                                     'MarkerSize', thickness, ...
