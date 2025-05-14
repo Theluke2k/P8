@@ -290,18 +290,23 @@ ax1 = subplot(1,3,1); hold(ax1,'on');
 ax2 = subplot(1,3,2); hold(ax2,'on');
 
 % Create robot quivers (they are identical, but must be created twice to live in multiple plots)
-robot_quivers_true = gobjects(M,1);     
-robot_quivers_est = gobjects(M,1);
+robot_true = gobjects(M,1);     
+robot_est = gobjects(M,1);
 
 % Plot robots on process plot (with their inital conditions)
 subplot(1,3,1)
+thickness = 7;
 for m = 1:M
-    robot_quivers_true(m) = quiver(ax1,  x_1(2*m-1), x_1(2*m), ...
-                                 0.1, 0.1, 'Color', colors{m}, ...
-                                 'LineWidth',4,'MaxHeadSize',4);
-    robot_quivers_est(m)  = quiver(ax2,  x_1(2*m-1), x_1(2*m), ...
-                                 0.1, 0.1, 'Color', colors{m}, ...
-                                 'LineWidth',4,'MaxHeadSize',4);
+    robot_true(m) = plot(ax1, x_1(2*m-1), x_1(2*m), 'o', ...
+                                    'MarkerSize', thickness, ...
+                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerEdgeColor', 'k', ...
+                                    'LineWidth', 1);
+    robot_est(m) = plot(ax2, x_1(2*m-1), x_1(2*m), 'o', ...
+                                    'MarkerSize', thickness, ...
+                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerEdgeColor', 'k', ...
+                                    'LineWidth', 1);
 end
 
 % Plot selected states
@@ -410,8 +415,8 @@ for k=2:K+1
 
     % Update robot positions
     for m = 1:M
-        set(robot_quivers_true(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
-        set(robot_quivers_est(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
+        set(robot_true(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
+        set(robot_est(m),'XData', x(2*m-1,k),'YData', x(2*m,k));
     end
     
     %update state and estimate plot
