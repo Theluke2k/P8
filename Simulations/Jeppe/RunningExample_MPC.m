@@ -15,14 +15,14 @@ sc = [15 1 0.5 0.0001 10 0.1 10 0.1]';        % Scaling
 T = diag(sc);
 
 % Random seed
-%rng(50)
+rng(1000)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
-min_dist = 5;                  % Minimum distance between robots
+min_dist = 0.01;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 10;
@@ -67,8 +67,8 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 1;
-    x_1(2*m) = 1;
+    x_1(2*m-1) = 0+(m-1);
+    x_1(2*m) = 0;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 

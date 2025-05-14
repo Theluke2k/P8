@@ -197,7 +197,7 @@ for i = 2:Hp+1
 
     % Robot constraints
     for m = 1:M
-        % Velocity and box constraints
+        % Velocity constraints
         x_vel = x_rd(2*M+2*m-1,i);
         y_vel = x_rd(2*M+2*m,i);
         opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
@@ -207,6 +207,17 @@ for i = 2:Hp+1
         opti.subject_to(xmax >= x_rd(2*m-1,i));
         opti.subject_to(ymin <= x_rd(2*m,i));
         opti.subject_to(ymax >= x_rd(2*m,i));
+
+        % Collision avoidance
+        for j = m+1:M
+            xm = x_rd(2*m-1, i);
+            ym = x_rd(2*m, i);
+            xj = x_rd(2*j-1, i);
+            yj = x_rd(2*j, i);
+
+            dist_squared = (xm - xj)^2 + (ym - yj)^2;
+            opti.subject_to(dist_squared >= dmin^2);
+        end
 
         % % Energy dynamics
         % x_pos = x_rd(2*m-1,i-1);
