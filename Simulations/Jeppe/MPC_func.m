@@ -90,19 +90,24 @@ opti = casadi.Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
-x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
+
+% x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 %b_slack = opti.variable(M,Hp+1);
 %e_low_slack = opti.variable(M,Hp+1);
 %e_high_slack = opti.variable(M,Hp+1);
 
+
+
 % States and varialbes (NOT to be optimized over)
+x_rd = MX.zeros(M*Nx_r + M*Nu_r,Hp+1);
 z_est = MX.zeros(Nx_p,Hp+1);          % Kalman filter states
 P = MX.zeros(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
 p = MX.zeros(Nx_p,Hp+1);              % KF error covariance diagonal elements
 
 
 % Enforce initial conditions
-opti.subject_to(x_rd(:,1) == x0);
+% opti.subject_to(x_rd(:,1) == x0);
+x_rd(:,1) = x0;
 z_est(:,1) = z_est_0;
 P(:,1:Nx_p) = P_0;
 
@@ -122,12 +127,12 @@ H_dum = MX.zeros(M,(Hp+1)*Nx_p);
 P_hat_dum = MX.zeros(Nx_p,(Hp+1)*Nx_p);
 
 for i = 2:Hp+1
-    % % Robot dynamics
-    % if i <= Hu+1
-    %     x_rd(:,i) = A_rd*x_rd(:,i-1) + B_rd*du(:,i);
-    % else
-    %     x_rd(:,i) = A_rd*x_rd(:,i-1);
-    % end
+    % Robot dynamics
+    if i <= Hu+1
+        x_rd(:,i) = A_rd*x_rd(:,i-1) + B_rd*du(:,i-1);
+    else
+        x_rd(:,i) = A_rd*x_rd(:,i-1);
+    end
 
     % Define temp. variables
     H = MX.zeros(M,Nx_p);
@@ -188,13 +193,13 @@ end
 %e(:,1) = e0;
 %cost_slack = 0;
 for i = 2:Hp+1
-    % Robot dynamics
-    if i <= Hu+1
-        opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1) + B_rd*du(:,i-1));
-    else
-        opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1)); % DU(k > Hu) = 0
-    end
-
+    % % Robot dynamics
+    % if i <= Hu+1
+    %     opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1) + B_rd*du(:,i-1));
+    % else
+    %     opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1)); % DU(k > Hu) = 0
+    % end
+    
     % Robot constraints
     for m = 1:M
         % Velocity constraints
