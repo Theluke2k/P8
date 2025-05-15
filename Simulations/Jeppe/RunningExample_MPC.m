@@ -4,18 +4,18 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 50;          % Simulation time [s]
+sim_time = 100;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-%sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
-sc = [1 1 1 1 1 1 1 1]';
+sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+%sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
-rng(52)
+rng(56)
 
 % MPC parameters
 Hp = 3;             % Prediction horizon
@@ -43,10 +43,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 200;
+M_0 = 50;
 beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+xs_0 = 10;
+ys_0 = 10;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -73,7 +73,7 @@ end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
 %% Dynamic Parameter Model
-tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
+tau_beta = 0.98;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
 Nu_p = 2;
@@ -221,11 +221,23 @@ e(:,1) = ones(M,1)*0.5;     % Robots fully charged at time 0
 charge_control = ones(M,K+1);
 charge_control(:,1) = zeros(M,1);
 
+% Parameters
+charger_x = 0;
+charger_y = 0;
+charger_r = 5;
+
+% Charging params
+% h_ch = 5; % Size of station
+% s_ch = 1; % Sharpness of corners
+% cx = 10; % x-coordinate of station center
+% cy = 10; % y-coordinate of station center
+
 % Energy dynamics
 t1 = 0.5;
 o1 = 5;
-charge_rate = 0.2;
+charge_rate = 0.5;
 en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
+%en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; 
 en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
 
 %power = @(x,y,v,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
@@ -233,10 +245,6 @@ en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
 %power = 0.05;
 
 
-% Parameters
-charger_x = 0;
-charger_y = 0;
-charger_r = 5;
 
 %% Create Required Vectors and Matrices
 % MPC
@@ -254,8 +262,6 @@ z_est(:,1) = inv(T)*z_est_0;
 x(:,1) = x_1;
 x(:,2) = x_1;
 P(:,:,1) = P_0;
-
-get_H_jaco(z(:,1),[21;21;21;21;21;21],M,sc)
 
 %% Plotting preparation
 % Initializations

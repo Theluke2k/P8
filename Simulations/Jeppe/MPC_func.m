@@ -248,10 +248,6 @@ for i = 2:Hp+1
             opti.subject_to(dy <= barrier_dist(m,i) + b_slack(m,i));
             opti.subject_to(-dy <= barrier_dist(m,i) + b_slack(m,i));
         end
-        
-
-        
-
         cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
         % Slack constraints
@@ -268,7 +264,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF/1000 + 1000*cost_slack + cost_energy);
+opti.minimize(cost + cost_KF + 1000*cost_slack + 1000*cost_energy);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
@@ -282,7 +278,6 @@ opti.solver('ipopt', solver_opts);
 if do_warm_start
     opti.set_initial(sol_prev.value_variables());
 end
-%opti.set_initial(v, ones(M,Hp+1));
 
 %sol = opti.solve();
 

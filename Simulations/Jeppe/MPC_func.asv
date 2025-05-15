@@ -182,6 +182,12 @@ for i = 2:Hp+1
     cost_KF = cost_KF + p(:,i)'*Q_vec;
 end
 
+% Reward for having much energy
+cost_energy = 0;
+for i = 2:Hp+1
+    cost_energy = cost_energy - sum(e(:,i));
+end
+
 % Constraints
 barrier_dist = MX.zeros(M,Hp+1);
 powers = MX.zeros(M,Hp+1);
@@ -215,33 +221,32 @@ for i = 2:Hp+1
         % %e(m,i) = e(m,i-1) + (v(m,i-1)*en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
         % e(m,i) = e(m,i-1) + (en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
         % Multi shooting
-        opti.subject_to(e(m,i) == e(m,i-1) + (en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts);
+        opti.subject_to(e(m,i) == e(m,i-1) + (v(m,i-1)*en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts);
 
 
         % General energy constraints
-        opti.subject_to(1e-8 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
-        opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
-        % opti.subject_to(1e-8 <= e(m,i));   % Energy must not go under 0
-        % opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
+        % opti.subject_to(1e-8 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
+        % opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
+        opti.subject_to(1e-8 <= e(m,i));   % Energy must not go under 0
+        opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
         
         % % Energy constaints (barrier)
-        
+        x_pos = x_rd(2*m-1,i);
+        y_pos = x_rd(2*m,i);
         if(i == Hp+1)
-            x_pos = x_rd(2*m-1,i);
-            y_pos = x_rd(2*m,i);
             % Normal Barrier
             % robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
             % barrier_dist(m,i) = vmax*((e(m,i))/en_cons(vmax)); % Distance that robot m can get by going full speed in one direction
             % opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
             % %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
-            
             % Box Barrier
-            ba = e(m,i) * (vmax / en_cons(vmax)); % Maximum distance to travel with current energy
+            barrier_dist(m,i) = e(m,i) * ((vmax / en_cons(vmax)) / sqrt(2)) - vmax*Ts; % Maximum distance to travel with current energy
             dx = x_rd(2*m-1,i) - charger_x;
             dy = x_rd(2*m,i) - charger_y;
-            opti.subject_to(dx <= dist_max);
-
-
+            opti.subject_to(dx <= barrier_dist(m,i) + b_slack(m,i));
+            opti.subject_to(-dx <= barrier_dist(m,i) + b_slack(m,i));
+            opti.subject_to(dy <= barrier_dist(m,i) + b_slack(m,i));
+            opti.subject_to(-dy <= barrier_dist(m,i) + b_slack(m,i));
         end
         cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
@@ -259,7 +264,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF/1000 + 10000*cost_slack);
+opti.minimize(cost + cost_KF + 1000*cost_slack + cost_energy);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
@@ -273,7 +278,6 @@ opti.solver('ipopt', solver_opts);
 if do_warm_start
     opti.set_initial(sol_prev.value_variables());
 end
-%opti.set_initial(v, ones(M,Hp+1));
 
 %sol = opti.solve();
 
@@ -301,7 +305,7 @@ end
 X_opt = sol.value(x_rd(1:2*M,:));
 U_opt = sol.value(x_rd(2*M+1:end,:));
 P_trace = 0;
-%charge_control = sol.value(v(:,1));
-charge_control = ones(M,1);
+charge_control = sol.value(v(:,1));
+%charge_control = ones(M,1);
 
 end
