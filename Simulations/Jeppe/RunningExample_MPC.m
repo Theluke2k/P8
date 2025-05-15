@@ -31,7 +31,7 @@ zmin = 0; zmax = 5;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
-M_ref = 200;
+M_ref = 500;
 beta_ref = 0.05;
 xs_ref = 20;
 ys_ref = 20;
@@ -45,8 +45,8 @@ Nx_p = length(z_0); % Number of states in process state vector
 % Guessed initial process states
 M_0 = 50;
 beta_0 = 0.05;
-xs_0 = 10;
-ys_0 = 10;
+xs_0 = 20;
+ys_0 = 20;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -227,17 +227,17 @@ charger_y = 0;
 charger_r = 5;
 
 % Charging params
-% h_ch = 5; % Size of station
-% s_ch = 1; % Sharpness of corners
-% cx = 10; % x-coordinate of station center
-% cy = 10; % y-coordinate of station center
+h_ch = 10; % Size of station
+s_ch = 0.5; % Sharpness of corners
+cx = 40; % x-coordinate of station center
+cy = 0; % y-coordinate of station center
 
 % Energy dynamics
-t1 = 0.5;
-o1 = 5;
-charge_rate = 0.5;
-en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
-%en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; 
+% t1 = 0.5;
+% o1 = 5;
+charge_rate = 0.2;
+%en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
+en_charge = @(x,y) (1/(1+exp(-s_ch*(x-(cx-h_ch)))))*(1/(1+exp(s_ch*(x-(cx+h_ch)))))*(1/(1+exp(-s_ch*(y-(cy-h_ch)))))*(1/(1+exp(s_ch*(y-(cy+h_ch)))))*charge_rate; 
 en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
 
 %power = @(x,y,v,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
@@ -407,7 +407,7 @@ for k=2:K+1
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
 
     % Package energy information
-    EN_params = {e(:,k), en_charge, en_cons, charger_x, charger_y, charger_r};
+    EN_params = {e(:,k), en_charge, en_cons, cx, cy, charger_r};
     
     % Compute optimal stuff
     [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k)] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
