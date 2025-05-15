@@ -67,7 +67,7 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 35;
+    x_1(2*m-1) = 20;
     x_1(2*m) = 5;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)

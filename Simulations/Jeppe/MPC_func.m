@@ -95,6 +95,7 @@ e = opti.variable(M,Hp+1);            % Robot positions defined as optimization 
 b_slack = opti.variable(M,Hp+1);
 e_low_slack = opti.variable(M,Hp+1);
 e_high_slack = opti.variable(M,Hp+1);
+slack_dist = opti.variable(M,Hp+1);
 v = opti.variable(M,Hp+1);
 
 % States and varialbes (NOT to be optimized over)
@@ -222,7 +223,7 @@ for i = 2:Hp+1
             yj = x_rd(2*j, i);
 
             dist_squared = (xm - xj)^2 + (ym - yj)^2;
-            opti.subject_to(dist_squared >= dmin^2);
+            opti.subject_to(dist_squared >= dmin^2 - slack_dist(m,i));
         end
 
         % Energy dynamics
@@ -259,12 +260,13 @@ for i = 2:Hp+1
             opti.subject_to(dy <= barrier_dist(m,i) + b_slack(m,i));
             opti.subject_to(-dy <= barrier_dist(m,i) + b_slack(m,i));
         end
-        cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
+        cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i) + slack_dist(m,i);
         
         % Slack constraints
         opti.subject_to(b_slack(m,i) >= 1e-8);
         opti.subject_to(e_low_slack(m,i) >= 1e-8);
         opti.subject_to(e_high_slack(m,i) >= 1e-8);
+        opti.subject_to(slack_dist(m,i) >= 1e-8);
         % opti.subject_to(v(m,i-1) >= 1e-8);
         % opti.subject_to(v(m,i-1) <= 1);
     end
