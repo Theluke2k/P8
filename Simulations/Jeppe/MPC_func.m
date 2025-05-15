@@ -224,15 +224,15 @@ for i = 2:Hp+1
         % opti.subject_to(1e-8 <= e(m,i));   % Energy must not go under 0
         % opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
         
-        % % Energy constaints (barrier)
-        % if(i == Hp+1)
-        %     x_pos = x_rd(2*m-1,i);
-        %     y_pos = x_rd(2*m,i);
-        %     robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-        %     barrier_dist(m,i) = vmax*((e(m,i))/en_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        %     %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
-        % end
+        % Energy constaints (barrier)
+        if(i == Hp+1)
+            x_pos = x_rd(2*m-1,i);
+            y_pos = x_rd(2*m,i);
+            robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
+            barrier_dist(m,i) = vmax*((e(m,i))/en_cons(vmax)); % Distance that robot m can get by going full speed in one direction
+            opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+            %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
+        end
         cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
         % Slack constraints
@@ -249,7 +249,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF/1000 + 1000*cost_slack);
+opti.minimize(cost + cost_KF/1000 + 10000*cost_slack);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;

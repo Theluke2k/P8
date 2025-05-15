@@ -18,8 +18,8 @@ T = diag(sc);
 rng(51)
 
 % MPC parameters
-Hp = 4;             % Prediction horizon
-Hu = 3;             % Control horizon
+Hp = 10;             % Prediction horizon
+Hu = 10;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
 min_dist = 5;                  % Minimum distance between robots
@@ -222,7 +222,7 @@ charge_control = ones(M,K+1);
 charge_control(:,1) = zeros(M,1);
 
 % Energy dynamics
-t1 = 2;
+t1 = 0.5;
 o1 = 5;
 charge_rate = 0.2;
 en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
