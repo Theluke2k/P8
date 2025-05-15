@@ -182,6 +182,12 @@ for i = 2:Hp+1
     cost_KF = cost_KF + p(:,i)'*Q_vec;
 end
 
+% Reward for having much energy
+cost_energy = 0;
+for i = 2:Hp+1
+    cost_energy = cost_energy - sum(e(:,i));
+end
+
 % Constraints
 barrier_dist = MX.zeros(M,Hp+1);
 powers = MX.zeros(M,Hp+1);
@@ -262,7 +268,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF/1000 + 1000*cost_slack);
+opti.minimize(cost + cost_KF/1000 + 1000*cost_slack + cost_energy);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
