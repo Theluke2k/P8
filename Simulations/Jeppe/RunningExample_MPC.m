@@ -217,13 +217,13 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1)*0.5;     % Robots fully charged at time 0
+e(:,1) = ones(M,1);     % Robots fully charged at time 0
 charging = zeros(M,K+1);
 e_full = zeros(M,K+1);
 
 % Energy dynamics
 t1 = 2;
-o1 = 5;
+o1 = 0.05;
 charge_rate = 0.2;
 power = @(x,y,v) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
 %power = @(v) 0.0001*v^2 + 0.05;
