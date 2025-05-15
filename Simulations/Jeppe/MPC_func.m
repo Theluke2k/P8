@@ -91,6 +91,7 @@ opti = casadi.Opti();
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
 x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
+e = opti.variable(M,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
 b_slack = opti.variable(M,Hp+1);
 e_low_slack = opti.variable(M,Hp+1);
 e_high_slack = opti.variable(M,Hp+1);
@@ -100,13 +101,18 @@ v = opti.variable(M,Hp+1);
 z_est = MX.zeros(Nx_p,Hp+1);          % Kalman filter states
 P = MX.zeros(Nx_p,(Hp+1)*Nx_p);       % Kalman filter error covariance matrix
 p = MX.zeros(Nx_p,Hp+1);              % KF error covariance diagonal elements
+%e = MX.zeros(M,Hp+1);              % Energy of robot
 %x_rd = MX.zeros(M*Nx_r + M*Nu_r,Hp+1);
 
+
 % Enforce initial conditions
- opti.subject_to(x_rd(:,1) == x0);
+opti.subject_to(x_rd(:,1) == x0);
+opti.subject_to(e(:,1) == e0);
 %x_rd(:,1) = x0;
+%e(:,1) = e0;
 z_est(:,1) = z_est_0;
 P(:,1:Nx_p) = P_0;
+
 
 %% Create Cost Function
 % Control input
@@ -180,8 +186,6 @@ end
 barrier_dist = MX.zeros(M,Hp+1);
 powers = MX.zeros(M,Hp+1);
 robot_dist = MX.zeros(M,Hp+1);
-e = MX.zeros(M,Hp+1);              % Energy of robot
-e(:,1) = e0;
 cost_slack = 0;
 for i = 2:Hp+1
     % Robot dynamics
@@ -207,25 +211,27 @@ for i = 2:Hp+1
         % Energy dynamics
         x_pos = x_rd(2*m-1,i-1);
         y_pos = x_rd(2*m,i-1);
-        %powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
-        % e(m,i) = e(m,i-1) + (v(m,i-1)*en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
-        e(m,i) = e(m,i-1) + (en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
-        
+        % Single shooting
+        % %e(m,i) = e(m,i-1) + (v(m,i-1)*en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
+        % e(m,i) = e(m,i-1) + (en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts;
+        % Multi shooting
+        opti.subject_to(e(m,i) == e(m,i-1) + (en_charge(x_pos,y_pos) - en_cons(sqrt(x_vel^2 + y_vel^2)))*Ts);
+
+
         % General energy constraints
         opti.subject_to(1e-8 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
         opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
         % opti.subject_to(1e-8 <= e(m,i));   % Energy must not go under 0
         % opti.subject_to(e(m,i) <= 1);   % Energy must not exceed 1
         
-        % Energy constaints (barrier)
+        % % Energy constaints (barrier)
         % if(i == Hp+1)
         %     x_pos = x_rd(2*m-1,i);
         %     y_pos = x_rd(2*m,i);
         %     robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
         %     barrier_dist(m,i) = vmax*((e(m,i))/en_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        %     %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
-        %     % opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
+        %     %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
         % end
         cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
@@ -257,7 +263,7 @@ opti.solver('ipopt', solver_opts);
 if do_warm_start
     opti.set_initial(sol_prev.value_variables());
 end
-
+%opti.set_initial(v, ones(M,Hp+1));
 
 %sol = opti.solve();
 
