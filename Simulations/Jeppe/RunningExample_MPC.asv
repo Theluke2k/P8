@@ -10,15 +10,15 @@ Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-%sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
-sc = [1 1 1 1 1 1 1 1]';
+sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+%sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
-rng(51)
+rng(50)
 
 % MPC parameters
-Hp = 4;             % Prediction horizon
+Hp = 6;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
@@ -43,10 +43,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 200;
+M_0 = 50;
 beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+xs_0 = 10;
+ys_0 = 10;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -217,18 +217,17 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1)*0.5;     % Robots fully charged at time 0
-charge_control = ones(M,K+1);
-charge_control(:,1) = zeros(M,1);
+e(:,1) = ones(M,1)*0.8;     % Robots fully charged at time 0
+charge_control = zeros(M,K+1);
 
 % Energy dynamics
 t1 = 2;
 o1 = 5;
 charge_rate = 0.2;
-en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
-en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
+en_charge = @(x,y,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy consumption dyna
+en_cons = (0.0001*v^2 + 0.05);
 
-%power = @(x,y,v,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
+power = @(x,y,v,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
 %power = @(v) 0.0001*v^2 + 0.05;
 %power = 0.05;
 
@@ -236,7 +235,7 @@ en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
 % Parameters
 charger_x = 0;
 charger_y = 0;
-charger_r = 5;
+charger_r = 4;
 
 %% Create Required Vectors and Matrices
 % MPC
@@ -378,7 +377,7 @@ for k=2:K+1
         %     e_full(m,k-1) = 0;
         % end
         % Compute new energy
-        e(m,k) = e(m,k-1) + (charge_control(m,k-1)*en_charge(x(2*m-1,k), x(2*m,k)) - en_cons(sqrt(u_opt(2*m-1)^2 + u_opt(2*m)^2)))*dt;
+        e(m,k) = e(m,k-1) + power(x(2*m-1,k), x(2*m,k), sqrt(u_opt(2*m-1)^2 + u_opt(2*m)^2), charge_control(m,i-1))*dt;
     end
     %disp(e(:,k));
 
@@ -390,7 +389,7 @@ for k=2:K+1
     if(k ==180)
         disp("")
     end
-    [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A_sc, B_sc, u(:,k-1), Q, y(:,k), R, x(:,k), sc);
+    [z_est(:,k), P(:,:,k), z_hat(:,k), charge_control(:,i)] = EKF(z_est(:,k-1), P(:,:,k-1), A_sc, B_sc, u(:,k-1), Q, y(:,k), R, x(:,k), sc);
    
     % Package all Kalman filter information for MPC
     u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
@@ -401,11 +400,13 @@ for k=2:K+1
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
 
     % Package energy information
-    EN_params = {e(:,k), en_charge, en_cons, charger_x, charger_y, charger_r};
+    EN_params = {e(:,k), power, charge_rate, charger_x, charger_y, charger_r};
     
     % Compute optimal stuff
-    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k)] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
+    %disp(x(:,k));
+    [X_opt, U_opt, P_trace, sol_prev] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
     u_opt = U_opt(:,2);
+    %x(:,k+1) = X_opt(:,2);
     do_warm_start = 1; % set warm start to 1 after first iteration
 
     % Update process plot
