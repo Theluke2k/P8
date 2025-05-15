@@ -4,7 +4,7 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 100;          % Simulation time [s]
+sim_time = 50;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -15,7 +15,7 @@ sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
-rng(51)
+rng(52)
 
 % MPC parameters
 Hp = 6;             % Prediction horizon

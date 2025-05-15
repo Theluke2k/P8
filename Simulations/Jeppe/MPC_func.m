@@ -234,7 +234,7 @@ for i = 2:Hp+1
             % opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
             % %opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2);
             % Box Barrier
-            barrier_dist(m,i) = e(m,i) * ((vmax / en_cons(vmax)) / sqrt(2)); % Maximum distance to travel with current energy
+            barrier_dist(m,i) = e(m,i) * ((vmax / en_cons(vmax)) / sqrt(2)) - vmax*Ts; % Maximum distance to travel with current energy
             dx = x_rd(2*m-1,i) - charger_x;
             dy = x_rd(2*m,i) - charger_y;
             opti.subject_to(dx <= barrier_dist(m,i) + b_slack(m,i));
