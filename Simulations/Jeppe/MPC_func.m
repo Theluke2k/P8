@@ -6,7 +6,7 @@ import casadi.*
 xmin = map_bounds(1); xmax = map_bounds(2);
 ymin = map_bounds(3); ymax = map_bounds(4);
 dmin = min_dist;
-vmax = 20;
+vmax = 5;
 
 % MPC parameters
 Hp = mpc_params(1); % Prediction horizon
@@ -214,6 +214,17 @@ for i = 2:Hp+1
         opti.subject_to(ymin <= x_rd(2*m,i));
         opti.subject_to(ymax >= x_rd(2*m,i));
 
+        % Collision avoidance
+        for j = m+1:M
+            xm = x_rd(2*m-1, i);
+            ym = x_rd(2*m, i);
+            xj = x_rd(2*j-1, i);
+            yj = x_rd(2*j, i);
+
+            dist_squared = (xm - xj)^2 + (ym - yj)^2;
+            opti.subject_to(dist_squared >= dmin^2);
+        end
+
         % Energy dynamics
         x_pos = x_rd(2*m-1,i-1);
         y_pos = x_rd(2*m,i-1);
@@ -264,7 +275,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF + 1000*cost_slack + 1000*cost_energy);
+opti.minimize(cost + cost_KF + 1000*cost_slack + 10*cost_energy);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;

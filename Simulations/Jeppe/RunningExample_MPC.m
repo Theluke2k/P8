@@ -22,7 +22,7 @@ Hp = 3;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
-min_dist = 5;                  % Minimum distance between robots
+min_dist = 2;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 40;
@@ -67,13 +67,13 @@ kf_init = [z_est_0, P_0];
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 1;
-    x_1(2*m) = 1;
+    x_1(2*m-1) = 35;
+    x_1(2*m) = 5;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
 %% Dynamic Parameter Model
-tau_beta = 0.98;       %spread increase parameter (exponential decay of beta)
+tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
 Nu_p = 2;
@@ -227,10 +227,10 @@ charger_y = 0;
 charger_r = 5;
 
 % Charging params
-h_ch = 10; % Size of station
+h_ch = 5; % Size of station
 s_ch = 0.5; % Sharpness of corners
-cx = 40; % x-coordinate of station center
-cy = 0; % y-coordinate of station center
+cx = 35; % x-coordinate of station center
+cy = 5; % y-coordinate of station center
 
 % Energy dynamics
 % t1 = 0.5;
