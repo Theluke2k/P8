@@ -13,9 +13,10 @@ Hp = mpc_params(1); % Prediction horizon
 Hu = mpc_params(2); % Control horizon
 
 % MPC cost function parameters
-lambda1 = cost_params(1); % Weight for smooth control
-lambda2 = cost_params(2); % Weight for uncertainty
-eps = cost_params(3); % Regularization parameter
+lambda1 = cost_params(1); % Weight for uncertainty
+lambda2 = cost_params(2); % Weight for slew rate
+lambda3 = cost_params(3); % Weight for slack variables
+eps = cost_params(4); % Regularization parameter
 
 % Simulation parameters
 Ts = sim_params(1); % MPC sampling time
@@ -96,7 +97,11 @@ du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)
 %e_low_slack = opti.variable(M,Hp+1);
 %e_high_slack = opti.variable(M,Hp+1);
 
-
+slack_dist = opti.variable(M,Hp+1);
+slack_map_x_low = opti.variable(M,Hp+1);
+slack_map_y_low = opti.variable(M,Hp+1);
+slack_map_x_high = opti.variable(M,Hp+1);
+slack_map_y_high = opti.variable(M,Hp+1);
 
 % States and varialbes (NOT to be optimized over)
 x_rd = MX.zeros(M*Nx_r + M*Nu_r,Hp+1);
@@ -191,7 +196,7 @@ end
 %robot_dist = MX.zeros(M,Hp+1);
 %e = MX.zeros(M,Hp+1);              % Energy of robot
 %e(:,1) = e0;
-%cost_slack = 0;
+cost_slack = 0;
 for i = 2:Hp+1
     % % Robot dynamics
     % if i <= Hu+1
@@ -208,10 +213,10 @@ for i = 2:Hp+1
         opti.subject_to(x_vel^2 + y_vel^2 <= vmax^2);
 
         % Box constraints
-        opti.subject_to(xmin <= x_rd(2*m-1,i));
-        opti.subject_to(xmax >= x_rd(2*m-1,i));
-        opti.subject_to(ymin <= x_rd(2*m,i));
-        opti.subject_to(ymax >= x_rd(2*m,i));
+        opti.subject_to(x_rd(2*m-1,i) >= xmin - slack_map_x_low(m,i));
+        opti.subject_to(x_rd(2*m-1,i) <= xmax + slack_map_x_high(m,i));
+        opti.subject_to(x_rd(2*m,i) >= ymin - slack_map_y_low(m,i));
+        opti.subject_to(x_rd(2*m,i) <= ymax + slack_map_y_high(m,i));
 
         % Collision avoidance
         for j = m+1:M
@@ -221,8 +226,17 @@ for i = 2:Hp+1
             yj = x_rd(2*j, i);
 
             dist_squared = (xm - xj)^2 + (ym - yj)^2;
-            opti.subject_to(dist_squared >= dmin^2);
+            opti.subject_to(dist_squared >= dmin^2 - slack_dist(m,i));
         end
+
+        % Slack variable constraints
+        opti.subject_to(slack_dist(m,i) >= 1e-8); % IPOPT's defaults constraint tolerance is 1e-8
+        opti.subject_to(slack_map_x_low(m,i) >= 1e-8);
+        opti.subject_to(slack_map_x_high(m,i) >= 1e-8);
+        opti.subject_to(slack_map_y_low(m,i) >= 1e-8);
+        opti.subject_to(slack_map_y_high(m,i) >= 1e-8);
+
+        cost_slack = cost_slack + slack_dist(m,i) + slack_map_x_low(m,i) + slack_map_x_high(m,i) + slack_map_y_low(m,i) + slack_map_y_high(m,i);
 
         % % Energy dynamics
         % x_pos = x_rd(2*m-1,i-1);
@@ -257,7 +271,7 @@ end
 
 % Define MPC 'object'
 %opti.minimize(cost + cost_KF/1000 + 1000*cost_slack);
-opti.minimize(cost/100 + cost_KF/10);
+opti.minimize(lambda1*cost_KF + lambda2*cost + lambda3*cost_slack);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;

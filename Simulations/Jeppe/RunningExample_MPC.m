@@ -21,7 +21,7 @@ T = diag(sc);
 Hp = 6;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
+cost_params = [1/10, 1e-4, 1e3, 1e-6];    % lambda1, lambda2, lambda3, regularization
 min_dist = 0.01;                  % Minimum distance between robots
 
 % Map bounderies
