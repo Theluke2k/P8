@@ -76,14 +76,6 @@ pos0 = rob_init{1};
 u0 = rob_init{4};
 x0 = [pos0; u0];    % Initial condition for delta u formulation
 
-%% ENERGY
-% Extract energy package info
-%e0 = en_params{1};
-%power = en_params{2};
-%charge_rate = en_params{3};
-%charger_x = en_params{4};
-%charger_y = en_params{5};
-%charger_r = en_params{6};
 
 %% MPC object
 % Setup opti
@@ -91,11 +83,6 @@ opti = casadi.Opti();
 
 % Decision variables (to be optimized over)
 du = opti.variable(M*Nu_r, Hu);   % Delta u (change in robot control input)  
-
-% x_rd = opti.variable(M*Nx_r + M*Nu_r,Hp+1);            % Robot positions defined as optimization variables but are bounded by constraints  
-%b_slack = opti.variable(M,Hp+1);
-%e_low_slack = opti.variable(M,Hp+1);
-%e_high_slack = opti.variable(M,Hp+1);
 
 slack_dist = opti.variable(M,Hp+1);
 slack_map_x_low = opti.variable(M,Hp+1);
@@ -111,7 +98,6 @@ p = MX.zeros(Nx_p,Hp+1);              % KF error covariance diagonal elements
 
 
 % Enforce initial conditions
-% opti.subject_to(x_rd(:,1) == x0);
 x_rd(:,1) = x0;
 z_est(:,1) = z_est_0;
 P(:,1:Nx_p) = P_0;
@@ -187,24 +173,8 @@ for i = 2:Hp+1
 end
 
 
-
-%power_cons = @(v) 0.0001*v^2 + 0.05;
-
-% Constraints
-%barrier_dist = MX.zeros(M,Hp+1);
-%powers = MX.zeros(M,Hp+1);
-%robot_dist = MX.zeros(M,Hp+1);
-%e = MX.zeros(M,Hp+1);              % Energy of robot
-%e(:,1) = e0;
 cost_slack = 0;
 for i = 2:Hp+1
-    % % Robot dynamics
-    % if i <= Hu+1
-    %     opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1) + B_rd*du(:,i-1));
-    % else
-    %     opti.subject_to(x_rd(:,i) == A_rd*x_rd(:,i-1)); % DU(k > Hu) = 0
-    % end
-    
     % Robot constraints
     for m = 1:M
         % Velocity constraints
@@ -235,43 +205,16 @@ for i = 2:Hp+1
         opti.subject_to(slack_map_x_high(m,i) >= 1e-8);
         opti.subject_to(slack_map_y_low(m,i) >= 1e-8);
         opti.subject_to(slack_map_y_high(m,i) >= 1e-8);
-
-        cost_slack = cost_slack + slack_dist(m,i) + slack_map_x_low(m,i) + slack_map_x_high(m,i) + slack_map_y_low(m,i) + slack_map_y_high(m,i);
-
-        % % Energy dynamics
-        % x_pos = x_rd(2*m-1,i-1);
-        % y_pos = x_rd(2*m,i-1);
-        % powers(m,i-1) = power(x_pos,y_pos,sqrt(x_vel^2 + y_vel^2));
-        % e(m,i) = e(m,i-1) + powers(m,i-1)*Ts;
-        % 
-        % % General energy constraints
-        % opti.subject_to(0 <= e(m,i) + e_low_slack(m,i));   % Energy must not go under 0
-        % opti.subject_to(e(m,i) <= 1 + e_high_slack(m,i));   % Energy must not exceed 1
-        % 
-        % % Energy constaints (barrier)
-        % if(i == Hp+1)
-        %     x_pos = x_rd(2*m-1,i);
-        %     y_pos = x_rd(2*m,i);
-        %     robot_dist(:,i) = sqrt((x_pos - charger_x)^2 + (y_pos - charger_y)^2);
-        %     barrier_dist(m,i) = vmax*(e(m,i)/power_cons(vmax)); % Distance that robot m can get by going full speed in one direction
-        %     opti.subject_to((x_pos - charger_x)^2 + (y_pos - charger_y)^2 <= barrier_dist(m,i)^2 + b_slack(m,i));
-        % end
-        % cost_slack = cost_slack + b_slack(m,i) + e_low_slack(m,i) + e_high_slack(m,i);
         
-        % Slack constraints
-        % opti.subject_to(b_slack(m,i) >= 0);
-        % opti.subject_to(e_low_slack(m,i) >= 0);
-        % opti.subject_to(e_high_slack(m,i) >= 0);
+        % Update slack cost
+        cost_slack = cost_slack + slack_dist(m,i) + slack_map_x_low(m,i) + slack_map_x_high(m,i) + slack_map_y_low(m,i) + slack_map_y_high(m,i);
     end
 end
 
-% opti.set_initial(b_slack, ones(M,Hp+1));
-% opti.set_initial(e_low_slack, ones(M,Hp+1));
-% opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-%opti.minimize(cost + cost_KF/1000 + 1000*cost_slack);
 opti.minimize(lambda1*cost_KF + lambda2*cost + lambda3*cost_slack);
+
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;
@@ -285,9 +228,6 @@ opti.solver('ipopt', solver_opts);
 if do_warm_start
     opti.set_initial(sol_prev.value_variables());
 end
-
-
-%sol = opti.solve();
 
 % Solve
 try
