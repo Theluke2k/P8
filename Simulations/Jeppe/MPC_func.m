@@ -1,4 +1,4 @@
-function [X_opt,U_opt,P_trace, sol, charge_control] = MPC_func(rob_init, kf_init, en_params, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev, sc)
+function [X_opt,U_opt,P_trace, sol, charge_control] = MPC_func(rob_init, kf_init, en_params, tuning, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev, sc)
 %% Parameters
 import casadi.*
 
@@ -15,7 +15,8 @@ Hu = mpc_params(2); % Control horizon
 % MPC cost function parameters
 lambda1 = cost_params(1); % Weight for smooth control
 lambda2 = cost_params(2); % Weight for uncertainty
-eps = cost_params(3); % Regularization parameter
+lambda3 = cost_params(3); % Weight for uncertainty
+lambda4 = cost_params(4); % Weight for uncertainty
 
 % Simulation parameters
 Ts = sim_params(1); % MPC sampling time
@@ -43,16 +44,8 @@ Nx_p = size(A_p,1);       % Number of states in process model
 Nu_p = size(B_p,2);       % Number of inputs in process model
 
 %% Robot model and Tuning
-% Tuning for a single robot
-% Q = eye(Nx_p);
-% %Q(1,1) = (20/500)^2;
-% Q(2,2) = 0;
-% Q(4,4) = 0;
-% Q(6,6) = 0;
-% Q(8,8) = 0;
-Q_vec = [1;0;1;0;1;0;1;0];
-R_single = [0 0;
-     0 0];
+Q_vec = tuning{1};
+R_single = tuning{2};
 
 % Import robot dynamics from parameters
 A_r = rob_init{2};    % Robot system matrix
@@ -82,7 +75,6 @@ en_charge = en_params{2};
 en_cons = en_params{3};
 charger_x = en_params{4};
 charger_y = en_params{5};
-charger_r = en_params{6};
 
 %% MPC object
 % Setup opti
@@ -277,7 +269,7 @@ opti.set_initial(e_low_slack, ones(M,Hp+1));
 opti.set_initial(e_high_slack, ones(M,Hp+1));
 
 % Define MPC 'object'
-opti.minimize(cost + cost_KF + 1000*cost_slack + 10*cost_energy);
+opti.minimize(lambda1*cost + lambda2*cost_KF + lambda3*cost_energy + lambda4*cost_slack);
 solver_opts = struct();
 %solver_opts.ipopt.max_iter = 5000;
 %solver_opts.ipopt.tol = 1e-3;

@@ -4,25 +4,26 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 100;          % Simulation time [s]
+sim_time = 30;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
 state_plot_selec = [1];            % Select states to plot
 error_cv_selec = [1,3,5,7];
-sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling
+sc = [200 1 0.05 0.0001 20 0.1 20 0.1]';        % Scaling (FIXED)
+%sc = [200 1 0.05 1 20 1 20 1]';
 %sc = [1 1 1 1 1 1 1 1]';
 T = diag(sc);
 
 % Random seed
-rng(56)
+rng(57)
 
 % MPC parameters
-Hp = 3;             % Prediction horizon
-Hu = 3;             % Control horizon
+Hp = 2;             % Prediction horizon
+Hu = 2;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [1e-6, 1, 1e-6];    % lambda1, lambda2, epsilon
-min_dist = 2;                  % Minimum distance between robots
+cost_params = [0.1, 1, 10, 1e3];    % lambda1, lambda2, epsilon
+min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 40;
@@ -43,10 +44,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 50;
+M_0 = 400;
 beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+xs_0 = 15;
+ys_0 = 25;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -59,21 +60,23 @@ P_0 = zeros(Nx_p);
 % P_0(3,3) = (beta_ref - beta_0)^2;
 % P_0(5,5) = (xs_ref - xs_0)^2;
 % P_0(7,7) = (ys_ref - ys_0)^2;
-% P_0(1,1) = 1;
-% P_0(5,5) = 1;
-% P_0(7,7) = 1;
-kf_init = [z_est_0, P_0];
+%P_0 = eye(Nx_p);
 
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
 for m = 1:M
-    x_1(2*m-1) = 20;
-    x_1(2*m) = 5;
+    x_1(2*m-1) = m;
+    x_1(2*m) = 0;
 end
 U_prev = zeros(2*M,1);           % (2*M values again)
 
+% MPC Tuning
+Q_vec = [1/z_est_0(1); 0; 1/z_est_0(3); 0; 1/z_est_0(5); 0; 1/z_est_0(7); 0];
+R_single = eye(2);
+mpc_tuning = {Q_vec, R_single};
+
 %% Dynamic Parameter Model
-tau_beta = 0.95;       %spread increase parameter (exponential decay of beta)
+tau_beta = 0.97;       %spread increase parameter (exponential decay of beta)
 
 % Inputs
 Nu_p = 2;
@@ -123,7 +126,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.1; sigma_y = 0.1;
+sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.05; sigma_y = 0.05;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
@@ -132,56 +135,6 @@ Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; %
 sigma_measurement = 0.1;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
-
-% % Measurement model - h_i(z,x,y) = (M*beta/pi)*exp(-beta*((x-xs).^2 + (y-ys).^2))
-% h_p = @(states,px,py) (states(1)*states(3)/pi)*exp(-states(3)*((px-states(5)).^2 + (py-states(7)).^2));
-% h_vec = @(z,x,M) arrayfun(@(m) h_p(z, x(2*m-1), x(2*m)), (1:M)');
-% % TESTING
-% % h(z_0,x_1)
-% % h = zeros(M,1);
-% % for m = 1:M
-% %     h(m) = h_p(z_0, x_1(2*m-1), x_1(2*m));
-% % end
-% % h
-% 
-% % Functions used in computing the Jacobian
-% H_m1 = @(z, px, py) h_p(z, px, py)/z(1);
-% H_m3 = @(z, px, py) h_p(z, px, py)*(1/z(3) - ((px - z(5))^2 + (py - z(7))^2));
-% H_m5 = @(z, px, py) h_p(z, px, py)*(-2*z(3)*(z(5) - px));
-% H_m7 = @(z, px, py) h_p(z, px, py)*(-2*z(3)*(z(7) - py));
-% H_m = @(z, px, py) [H_m1(z, px, py), 0, H_m3(z, px, py), 0, H_m5(z, px, py), 0, H_m7(z, px, py), 0];
-% 
-% % Dynamically construct a function that computes the Jacobian for a
-% % specific state and robot position
-% H = @(z, x, M) cell2mat(...
-%             arrayfun(...
-%             @(m) H_m(z, x(2*m-1), x(2*m)), (1:M)', 'UniformOutput', false));
-
-% %TESTING
-% H(z_0,x_1,M)
-%get_H_jaco(z,x_1,M,sc)
-% H = zeros(M,Nx_p);
-% for m=1:M
-%     x_pos = x_1(2*m-1);
-%     y_pos = x_1(2*m);
-%     y = h_p(z_0, x_pos, y_pos);
-%     H(m,1) = y/z_0(1);
-%     H(m,3) = -y*((x_pos-z_0(5))^2 + (y_pos-z_0(7))^2) + y/z_0(3);
-%     H(m,5) = -2*y*z_0(3)*(z_0(5)-x_pos);
-%     H(m,7) = -2*y*z_0(3)*(z_0(7)-y_pos);
-% end
-% H
-
-% Transformation for scaling
-% syms k_M k_Mdot k_beta k_betadot k_xs k_xsdot k_ys k_ysdot real
-% T = [k_M 0 0 0 0 0 0 0;
-%      0 k_Mdot 0 0 0 0 0 0;
-%      0 0 k_beta 0 0 0 0 0;
-%      0 0 0 k_betadot 0 0 0 0;
-%      0 0 0 0 k_xs 0 0 0;
-%      0 0 0 0 0 k_xsdot 0 0;
-%      0 0 0 0 0 0 k_ys 0;
-%      0 0 0 0 0 0 0 k_ysdot];
 
 % Everyting recomputed for the MPC
 A_MPC = A_func(Ts);
@@ -217,34 +170,21 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1)*0.5;     % Robots fully charged at time 0
+e(:,1) = ones(M,1)*0.9;     % Robots fully charged at time 0
 charge_control = ones(M,K+1);
 charge_control(:,1) = zeros(M,1);
-
-% Parameters
-charger_x = 0;
-charger_y = 0;
-charger_r = 5;
 
 % Charging params
 h_ch = 5; % Size of station
 s_ch = 0.5; % Sharpness of corners
-cx = 35; % x-coordinate of station center
-cy = 5; % y-coordinate of station center
+cx = 0; % x-coordinate of station center
+cy = 0; % y-coordinate of station center
 
 % Energy dynamics
-% t1 = 0.5;
-% o1 = 5;
 charge_rate = 0.2;
 %en_charge = @(x,y) (1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate; % Energy charging function
 en_charge = @(x,y) (1/(1+exp(-s_ch*(x-(cx-h_ch)))))*(1/(1+exp(s_ch*(x-(cx+h_ch)))))*(1/(1+exp(-s_ch*(y-(cy-h_ch)))))*(1/(1+exp(s_ch*(y-(cy+h_ch)))))*charge_rate; 
 en_cons = @(v) 0.0001*v^2 + 0.05; % Energy consumption function
-
-%power = @(x,y,v,ctrl) ctrl*(1/(1+exp(t1*(x-o1))))*(1/(1+exp(t1*(y-o1))))*charge_rate - (0.0001*v^2 + 0.05);
-%power = @(v) 0.0001*v^2 + 0.05;
-%power = 0.05;
-
-
 
 %% Create Required Vectors and Matrices
 % MPC
@@ -304,14 +244,15 @@ robot_est = gobjects(M,1);
 
 % Plot robots on process plot (with their inital conditions)
 subplot(1,3,1)
+thickness = 5;
 for m = 1:M
     robot_true(m) = plot(ax1, x_1(2*m-1), x_1(2*m), 'o', ...
-                                    'MarkerSize', 10, ...
+                                    'MarkerSize', thickness, ...
                                     'MarkerFaceColor', colors{m}, ...
                                     'MarkerEdgeColor', 'k', ...
                                     'LineWidth', 1);
     robot_est(m) = plot(ax2, x_1(2*m-1), x_1(2*m), 'o', ...
-                                    'MarkerSize', 10, ...
+                                    'MarkerSize', thickness, ...
                                     'MarkerFaceColor', colors{m}, ...
                                     'MarkerEdgeColor', 'k', ...
                                     'LineWidth', 1);
@@ -407,10 +348,10 @@ for k=2:K+1
     ROB_params = {x(:,k), A_r_MPC, B_r_MPC, u_opt};
 
     % Package energy information
-    EN_params = {e(:,k), en_charge, en_cons, cx, cy, charger_r};
+    EN_params = {e(:,k), en_charge, en_cons, cx, cy};
     
     % Compute optimal stuff
-    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k)] = MPC_func(ROB_params, KF_params, EN_params, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
+    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k)] = MPC_func(ROB_params, KF_params, EN_params, mpc_tuning, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
     u_opt = U_opt(:,2);
     do_warm_start = 1; % set warm start to 1 after first iteration
 
@@ -439,3 +380,10 @@ for k=2:K+1
     end
     drawnow limitrate
 end
+
+
+%% Plotting After Finish
+% figure
+% for i=1:Hp+1
+% 
+% end
