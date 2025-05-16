@@ -4,7 +4,7 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 120;          % Simulation time [s]
+sim_time = 30;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -19,11 +19,11 @@ T = diag(sc);
 rng(57)
 
 % MPC parameters
-Hp = 4;             % Prediction horizon
+Hp = 3;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [0.1, 1, 10, 1e3];    % lambda1, lambda2, epsilon
-min_dist = 2;                  % Minimum distance between robots
+min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
 xmin = 0; xmax = 40;
@@ -170,7 +170,7 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1)*0.9;     % Robots fully charged at time 0
+e(:,1) = ones(M,1)*0.8;     % Robots fully charged at time 0
 charge_control = ones(M,K+1);
 charge_control(:,1) = zeros(M,1);
 
@@ -302,6 +302,9 @@ do_warm_start = 0;
 
 z_real = zeros(Nx_p,K+1);
 z_est_real = zeros(Nx_p,K+1);
+z_real(:,1) = z_0;
+z_est_real(:,1) = z_est_0;
+
 
 for k=2:K+1
     % Update true process
@@ -383,4 +386,61 @@ end
 
 
 %% Plotting After Finish
+% Time vector (you already have this as t_vec = (0:K)*dt;)
+t = t_vec;
+
+figure('Position',[100 100 600 400])
+t = t_vec;
+% two rows: x‐vs‐t on top, y‐vs‐t below
+subplot(2,1,1); hold on
+for m = 1:M
+    plot(t, x(2*m-1,:), 'LineWidth',1.5);
+end
+ylabel('X [m]')
+legend(arrayfun(@(m) sprintf('R%d',m),1:M,'Uni',0),'Location','best')
+grid on
+
+subplot(2,1,2); hold on
+for m = 1:M
+    plot(t, x(2*m,:),   'LineWidth',1.5);
+end
+xlabel('Time [s]'), ylabel('Y [m]')
+grid on
+subtitle('Robot Coordinates vs.\ Time')
+
+% 2) One figure per Kalman‐filter state: true vs estimated
+% for s = 1:Nx_p
+%     figure
+%     plot( t, z_real(s, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+%     hold on
+%     plot( t, z_est_real(s,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+%     xlabel('Time [s]')
+%     ylabel(sprintf('State %d', s))
+%     title(sprintf('Kalman State %d: True vs Estimated', s))
+%     legend('Location','best')
+%     grid on
+%     hold off
+% end
+
+% State plot of M
 figure
+plot( t, z_real(1, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(1,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('State %d', s))
+title(sprintf('Process State M. True vs Estimated', s))
+legend()
+grid on
+hold off
+
+% State plot of beta
+plot( t, z_real(1, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(1,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('State %d', s))
+title(sprintf('Process State . True vs Estimated', s))
+legend()
+grid on
+hold off

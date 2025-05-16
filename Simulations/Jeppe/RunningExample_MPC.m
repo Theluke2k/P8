@@ -19,8 +19,8 @@ T = diag(sc);
 rng(57)
 
 % MPC parameters
-Hp = 2;             % Prediction horizon
-Hu = 2;             % Control horizon
+Hp = 3;             % Prediction horizon
+Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [0.1, 1, 10, 1e3];    % lambda1, lambda2, epsilon
 min_dist = 1;                  % Minimum distance between robots
@@ -170,7 +170,7 @@ Nu_r = size(B_r_single,2);
 %% Energy
 % Energy variables
 e = zeros(M,K+1);
-e(:,1) = ones(M,1)*0.9;     % Robots fully charged at time 0
+e(:,1) = ones(M,1)*0.8;     % Robots fully charged at time 0
 charge_control = ones(M,K+1);
 charge_control(:,1) = zeros(M,1);
 
@@ -302,6 +302,9 @@ do_warm_start = 0;
 
 z_real = zeros(Nx_p,K+1);
 z_est_real = zeros(Nx_p,K+1);
+z_real(:,1) = z_0;
+z_est_real(:,1) = z_est_0;
+
 
 for k=2:K+1
     % Update true process
@@ -383,7 +386,98 @@ end
 
 
 %% Plotting After Finish
-% figure
-% for i=1:Hp+1
-% 
-% end
+close all
+
+% Figure settings
+hFig = figure; 
+
+set(hFig, ...
+    'Units','centimeters', ...
+    'Position',[5 5 20 14] ...     % [left bottom width height] on screen
+);
+
+set(hFig, ...
+    'PaperSize',[21 29.7], ...
+    'PaperOrientation','portrait', ...
+    'PaperPosition',[1 1 19 27.7], ...
+    'PaperPositionMode','manual' ...
+);
+
+set(hFig, ...
+    'DefaultAxesFontSize', 10, ...
+    'DefaultTextFontSize', 10, ...
+    'DefaultLegendFontSize', 9 ...
+);
+
+% Time vector (you already have this as t_vec = (0:K)*dt;)
+t = t_vec;
+
+% two rows: x‐vs‐t on top, y‐vs‐t below
+subplot(3,2,5); hold on
+% 1) Top‐down map of each robot’s path
+hold on
+colors = lines(M);
+for m = 1:M
+    plot( x(2*m-1, :), x(2*m, :), '-', 'Color', colors(m,:), ...
+          'LineWidth', 1.5, 'DisplayName', sprintf('Robot %d', m) );
+end
+xlabel('X [m]')
+ylabel('Y [m]')
+title('Robot Trajectories (Top View)')
+axis([xmin xmax ymin ymax])
+legend('Location','best')
+grid on
+hold off
+
+% State plot of M
+subplot(3,2,1)
+plot( t, z_real(1, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(1,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('M'))
+title(sprintf('Process State M', s))
+legend('Location','best')
+ylim([0 1000])
+grid on
+hold off
+
+% State plot of beta
+subplot(3,2,2)
+plot( t, z_real(3, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(3,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('\\beta'))
+title(sprintf('Process State \\beta', s))
+legend('Location','best')
+grid on
+hold off
+
+% State plot of xs
+subplot(3,2,3)
+plot( t, z_real(5, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(5,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('x_s'))
+title(sprintf('Process State x_s', s))
+legend('Location','best')
+ylim([xmin xmax])
+grid on
+hold off
+
+% State plot of xs
+subplot(3,2,4)
+plot( t, z_real(7, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
+hold on
+plot( t, z_est_real(7,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
+xlabel('Time [s]')
+ylabel(sprintf('y_s'))
+title(sprintf('Process State y_s', s))
+legend('Location','best')
+ylim([ymin ymax])
+grid on
+hold off
+
+print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
