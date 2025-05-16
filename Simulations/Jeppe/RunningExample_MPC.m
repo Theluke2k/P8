@@ -4,7 +4,7 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 30;          % Simulation time [s]
+sim_time = 15;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -22,7 +22,7 @@ rng(57)
 Hp = 3;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [0.1, 1, 10, 1e3];    % lambda1, lambda2, epsilon
+cost_params = [0.1, 1, 1, 1];    % lambda1, lambda2, epsilon
 min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
@@ -56,10 +56,10 @@ z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % 
 
 % Initial error covariance matrix
 P_0 = zeros(Nx_p);
-% P_0(1,1) = (M_ref - M_0)^2;
-% P_0(3,3) = (beta_ref - beta_0)^2;
-% P_0(5,5) = (xs_ref - xs_0)^2;
-% P_0(7,7) = (ys_ref - ys_0)^2;
+P_0(1,1) = (M_ref - M_0)^2;
+P_0(3,3) = (beta_ref - beta_0)^2;
+P_0(5,5) = (xs_ref - xs_0)^2;
+P_0(7,7) = (ys_ref - ys_0)^2;
 %P_0 = eye(Nx_p);
 
 % Initial robot positions, Z0 and control inputs, Uprev
@@ -300,12 +300,19 @@ z_hat(:,1) = z_est(:,1);
 sol_prev = 0;
 do_warm_start = 0;
 
+% Live plotting variables
 z_real = zeros(Nx_p,K+1);
 z_est_real = zeros(Nx_p,K+1);
 z_real(:,1) = z_0;
 z_est_real(:,1) = z_est_0;
 
+% Offline plotting varialbes
+e_low_slack = zeros(M,K+1);     % Slack on lower energy bound
+e_high_slack = zeros(M,K+1);    % Slack on higher energy bound
+b_slack = zeros(M,K+1);         % Slack on energy barrier
+dist_slack = zeros(M,K+1);      % Slack on minimum collision distance
 
+% MAIN SIMULATION LOOP
 for k=2:K+1
     % Update true process
     w = (inv(T)*G)*normrnd(mu_w,v);
@@ -354,9 +361,17 @@ for k=2:K+1
     EN_params = {e(:,k), en_charge, en_cons, cx, cy};
     
     % Compute optimal stuff
-    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k)] = MPC_func(ROB_params, KF_params, EN_params, mpc_tuning, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
+    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k), slacks] = MPC_func(ROB_params, KF_params, EN_params, mpc_tuning, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
     u_opt = U_opt(:,2);
-    do_warm_start = 1; % set warm start to 1 after first iteration
+
+    % set warm start to 1 after first iteration
+    do_warm_start = 1; 
+    
+    % Insert slack variables into respective variables for later plotting
+    e_low_slack(:,k+1) = slacks{1};
+    e_high_slack(:,k+1) = slacks{2};
+    b_slack(:,k+1) = slacks{3};
+    dist_slack(:,k+1) = slacks{4};
 
     % Update process plot
     %subplot(1,2,1)
@@ -384,6 +399,11 @@ for k=2:K+1
     drawnow limitrate
 end
 
+% Cut off last column of slack variables before plotting
+e_low_slack(:,end) = [];
+e_high_slack(:,end) = [];
+b_slack(:,end) = [];
+dist_slack(:,end) = [];
 
 %% Plotting After Finish
 close all
@@ -409,75 +429,191 @@ set(hFig, ...
     'DefaultLegendFontSize', 9 ...
 );
 
-% Time vector (you already have this as t_vec = (0:K)*dt;)
+% Time vector
 t = t_vec;
-
-% two rows: x‐vs‐t on top, y‐vs‐t below
-subplot(3,2,5); hold on
-% 1) Top‐down map of each robot’s path
+subplot(4,2,1); hold on
 hold on
 colors = lines(M);
 for m = 1:M
-    plot( x(2*m-1, :), x(2*m, :), '-', 'Color', colors(m,:), ...
-          'LineWidth', 1.5, 'DisplayName', sprintf('Robot %d', m) );
+    plot(x(2*m-1, :), x(2*m, :), '-o', 'MarkerSize', 1.5)
+    plot(x(2*m-1, 1), x(2*m, 1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off')
+    plot(x(2*m-1, end), x(2*m, end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off')
 end
 xlabel('X [m]')
 ylabel('Y [m]')
 title('Robot Trajectories (Top View)')
 axis([xmin xmax ymin ymax])
-legend('Location','best')
+% legend('Location','best')
+grid on
+hold off
+
+% Energy
+subplot(4,2,2)
+hold on 
+for m = 1:M
+    plot(t, e(m,:), 'LineWidth',0.9)
+end
+xlabel('Time [s]')
+ylabel(sprintf('Percentage'))
+title(sprintf('Robot Energies'))
+ylim([0 1])
+grid on
+hold off
+
+% Error covariance
+subplot(4,2,7)
+hold on 
+semilogy(t, squeeze(P(1,1,:)), 'LineWidth',0.9)
+semilogy(t, squeeze(P(3,3,:))+1e-3, 'LineWidth',0.9)
+semilogy(t, squeeze(P(5,5,:)), 'LineWidth',0.9)
+semilogy(t, squeeze(P(7,7,:)), 'LineWidth',0.9)
+xlabel('Time [s]')
+ylabel(sprintf('Value'))
+title(sprintf('State Variances'))
+grid on
+hold off
+set(gca,'YScale','log')
+
+% Slacks
+subplot(4,2,8)
+hold on 
+for m = 1:M
+    plot(t, e_low_slack(m,:), 'LineWidth',0.9)
+    plot(t, e_high_slack(m,:), 'LineWidth',0.9)
+    plot(t, b_slack(m,:), 'LineWidth',0.9)
+    plot(t, dist_slack(m,:), 'LineWidth',0.9)
+end
+xlabel('Time [s]')
+ylabel(sprintf('Value'))
+title(sprintf('Slack Variables'))
 grid on
 hold off
 
 % State plot of M
-subplot(3,2,1)
+subplot(4,2,3)
 plot( t, z_real(1, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(1,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
 ylabel(sprintf('M'))
-title(sprintf('Process State M', s))
-legend('Location','best')
+title(sprintf('Process State M'))
+%legend('Location','best')
 ylim([0 1000])
 grid on
 hold off
 
 % State plot of beta
-subplot(3,2,2)
+subplot(4,2,4)
 plot( t, z_real(3, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(3,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
 ylabel(sprintf('\\beta'))
-title(sprintf('Process State \\beta', s))
-legend('Location','best')
+title(sprintf('Process State \\beta'))
+% legend('Location','best')
 grid on
 hold off
 
 % State plot of xs
-subplot(3,2,3)
+subplot(4,2,5)
 plot( t, z_real(5, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(5,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
 ylabel(sprintf('x_s'))
-title(sprintf('Process State x_s', s))
-legend('Location','best')
+title(sprintf('Process State x_s'))
+% legend('Location','best')
 ylim([xmin xmax])
 grid on
 hold off
 
-% State plot of xs
-subplot(3,2,4)
+% State plot of ys
+subplot(4,2,6)
 plot( t, z_real(7, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(7,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
 ylabel(sprintf('y_s'))
-title(sprintf('Process State y_s', s))
-legend('Location','best')
+title(sprintf('Process State y_s'))
+% legend('Location','best')
 ylim([ymin ymax])
 grid on
 hold off
 
 print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
+
+% hFig = figure;
+% set(hFig, 'Units','centimeters', 'Position',[5 5 20 14], ...
+%           'PaperSize',[21 29.7], 'PaperOrientation','portrait', ...
+%           'PaperPosition',[1 1 19 27.7], 'PaperPositionMode','manual', ...
+%           'DefaultAxesFontSize',10, 'DefaultTextFontSize',10, ...
+%           'DefaultLegendFontSize',9);
+% 
+% t = tiledlayout(6,4, ...
+%      'TileSpacing','compact', ...   % remove gaps between tiles
+%      'Padding','none');             % remove outer margins
+% 
+% ax1 = nexttile(1, [2 2]);
+% plot(ax1, t_vec, z_real(1,:),   'b-', 'LineWidth',0.9, 'DisplayName','True');
+% hold(ax1,'on');
+% plot(ax1, t_vec, z_est_real(1,:),'r--','LineWidth',0.9, 'DisplayName','Estimated');
+% hold(ax1,'off');
+% title(ax1,'Process State M');
+% xlabel(ax1,'Time [s]');
+% ylabel(ax1,'M');
+% ylim(ax1,[0 1000]);
+% legend(ax1,'Location','best');
+% grid(ax1,'on');
+% 
+% ax2 = nexttile(3, [2 2]);
+% plot(ax2, t_vec, z_real(3,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
+% hold(ax2,'on');
+% plot(ax2, t_vec, z_est_real(3,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
+% hold(ax2,'off');
+% title(ax2,'Process State \beta');
+% xlabel(ax2,'Time [s]');
+% ylabel(ax2,'\beta');
+% legend(ax2,'Location','best');
+% grid(ax2,'on');
+% 
+% ax3 = nexttile(9, [2 2]);
+% plot(ax3, t_vec, z_real(5,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
+% hold(ax3,'on');
+% plot(ax3, t_vec, z_est_real(5,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
+% hold(ax3,'off');
+% title(ax3,'Process State x_s');
+% xlabel(ax3,'Time [s]');
+% ylabel(ax3,'x_s');
+% ylim(ax3,[xmin xmax]);
+% legend(ax3,'Location','best');
+% grid(ax3,'on');
+% 
+% ax4 = nexttile(11, [2 2]);
+% plot(ax4, t_vec, z_real(7,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
+% hold(ax4,'on');
+% plot(ax4, t_vec, z_est_real(7,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
+% hold(ax4,'off');
+% title(ax4,'Process State y_s');
+% xlabel(ax4,'Time [s]');
+% ylabel(ax4,'y_s');
+% ylim(ax4,[ymin ymax]);
+% legend(ax4,'Location','best');
+% grid(ax4,'on');
+% 
+% ax5 = nexttile(18, [2 2]);
+% hold(ax5,'on');
+% colors = lines(M);
+% for m = 1:M
+%     plot(ax5, x(2*m-1,:), x(2*m,:), '-o', 'Color',colors(m,:), 'LineWidth',1);
+%     plot(ax5, x(2*m-1,1), x(2*m,1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off');
+%     plot(ax5, x(2*m-1,end), x(2*m,end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off');
+% end
+% hold(ax5,'off');
+% axis(ax5,[xmin xmax ymin ymax]);
+% xlabel(ax5,'X [m]');
+% ylabel(ax5,'Y [m]');
+% title(ax5,'Robot Trajectories (Top View)');
+% legend(ax5,'Location','best');
+% grid(ax5,'on');
+% 
+% print(hFig,'myFigure.pdf','-dpdf','-bestfit');
