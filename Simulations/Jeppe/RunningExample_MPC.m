@@ -22,7 +22,7 @@ rng(57)
 Hp = 3;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [0.1, 1, 1, 1];    % lambda1, lambda2, epsilon
+cost_params = [0.1, 1, 1, 1e3];    % lambda1, lambda2, epsilon
 min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
