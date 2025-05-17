@@ -299,7 +299,6 @@ try
     fprintf("Robot Dists"); disp(sol.value(robot_dist(:,Hp+1)'))
     fprintf("Objective: %.2f\n", sol.value(opti.f()))
     fprintf("Iterations: %d\n", sol.stats.iter_count)
-
 catch
     disp("MPC FAILED!!! :((((")
     debug = opti.debug

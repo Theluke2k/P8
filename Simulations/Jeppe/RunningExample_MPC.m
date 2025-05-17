@@ -4,7 +4,7 @@ clc; clear; close all;
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 15;          % Simulation time [s]
+sim_time = 60;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -32,7 +32,7 @@ zmin = 0; zmax = 5;
 map_bounds = [xmin, xmax, ymin, ymax];
 
 % True initial process states
-M_ref = 500;
+M_ref = 300;
 beta_ref = 0.05;
 xs_ref = 20;
 ys_ref = 20;
@@ -44,10 +44,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 400;
+M_0 = 200;
 beta_0 = 0.05;
 xs_0 = 15;
-ys_0 = 25;
+ys_0 = 20;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -58,8 +58,8 @@ z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % 
 P_0 = zeros(Nx_p);
 P_0(1,1) = (M_ref - M_0)^2;
 P_0(3,3) = (beta_ref - beta_0)^2;
-P_0(5,5) = (xs_ref - xs_0)^2;
-P_0(7,7) = (ys_ref - ys_0)^2;
+% P_0(5,5) = (xs_ref - xs_0)^2;
+% P_0(7,7) = (ys_ref - ys_0)^2;
 %P_0 = eye(Nx_p);
 
 % Initial robot positions, Z0 and control inputs, Uprev
@@ -126,7 +126,7 @@ G_func = @(dt) [0.5*dt^2 0 0 0;
     0 0 0 dt];
 % 
 G = G_func(dt);
-sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.05; sigma_y = 0.05;
+sigma_M = 2; sigma_beta = 0.00001; sigma_x = 0.01; sigma_y = 0.01;
 v = [sigma_M sigma_beta sigma_x sigma_y]';
 mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
@@ -195,6 +195,7 @@ z = zeros(Nx_p,K+1);           % True process states (Nx_p)
 z_est = zeros(Nx_p,K+1);       % Estimated process states by Kalman filter
 P = zeros(Nx_p,Nx_p,K+1);         % Error covariance matrix
 y = zeros(M,K+1);           % Measurements of process
+y_true = zeros(M,K+1);           % True process values and measurement points
 
 % Put initial conditions into vectors
 z(:,1) = inv(T)*z_0;
@@ -210,7 +211,29 @@ y_axis = linspace(ymin,ymax,50)';   % Process y-axis
 z_values_true = get_h(z(:,1),x_axis,y_axis,sc);    % Process values in defined area
 z_values_est = get_h(z_est(:,1), x_axis, y_axis,sc);
 t_vec = (0:K) * dt;               % Time vector for plotting
-colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
+%colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
+colors = [ ...
+   0.1216   0.4667   0.7059;  % blue
+   1.0000   0.4980   0.0549;  % orange
+   0.5804   0.4039   0.7412;  % purple
+   0.8392   0.1529   0.1569;  % red
+   0.4980   0.4980   0.4980   % gray
+   0.5490   0.3373   0.2941;  % brown
+   0.8902   0.4667   0.7608;  % pink
+   0.1725   0.6275   0.1725;  % green
+];
+% colors = [ ...
+%   228,  26,  28;
+%   55,  126, 184;
+%   77,  175,  74;
+%   152,  78, 163;
+%   255, 127,   0;
+%   255, 255,  51;
+%   166,  86,  40;
+%   247, 129, 191
+% ] / 255;
+
+
 
 % Initialize plotting objects that can be updated 
 process_plot_true = gobjects(1,1);         
@@ -248,12 +271,12 @@ thickness = 5;
 for m = 1:M
     robot_true(m) = plot(ax1, x_1(2*m-1), x_1(2*m), 'o', ...
                                     'MarkerSize', thickness, ...
-                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerFaceColor', colors(m,:), ...
                                     'MarkerEdgeColor', 'k', ...
                                     'LineWidth', 1);
     robot_est(m) = plot(ax2, x_1(2*m-1), x_1(2*m), 'o', ...
                                     'MarkerSize', thickness, ...
-                                    'MarkerFaceColor', colors{m}, ...
+                                    'MarkerFaceColor', colors(m,:), ...
                                     'MarkerEdgeColor', 'k', ...
                                     'LineWidth', 1);
 end
@@ -271,8 +294,8 @@ for i = 1:length(state_plot_selec)
     s = state_plot_selec(i);
     z_selected(i,1) = T(s,s)*z(s,1);   % Plug in initial states as first column
     z_est_selected(i,1) = T(s,s)*z_est(s,1);   % Plug in initial guessed states as first column
-    z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors{i});
-    z_est_selected_plot(i) = plot(0,z_est_selected(1,1),'DisplayName',sprintf('State %d est.', s),'Color',colors{i},'LineStyle','--');
+    z_selected_plot(i) = plot(0,z_selected(1,1),'DisplayName',sprintf('State %d', s),'Color',colors(i,:));
+    z_est_selected_plot(i) = plot(0,z_est_selected(1,1),'DisplayName',sprintf('State %d est.', s),'Color',colors(i,:),'LineStyle','--');
 end
 
 % Plot a selection of true and guessed initial states of the process
@@ -342,6 +365,7 @@ for k=2:K+1
     % Take measurements
     r = mvnrnd(mu_r',R)';
     y(:,k) = get_h_vec(z(:,k), x(:,k), M, sc) + r;
+    y_true(:,k) = y(:,k) - r;  % For plotting
     
     % Run Kalman filter iteration
     if(k ==180)
@@ -406,15 +430,29 @@ b_slack(:,end) = [];
 dist_slack(:,end) = [];
 
 %% Plotting After Finish
-close all
+%close all
 
 % Figure settings
-hFig = figure; 
+hFig = figure;
 
-set(hFig, ...
-    'Units','centimeters', ...
-    'Position',[5 5 20 14] ...     % [left bottom width height] on screen
-);
+% original (20×14 cm)  
+% set(hFig, 'Units','centimeters', 'Position',[5 5 20 14]);
+
+% put this right at the top of your script, before figure()
+set(groot, ...
+  'defaultFigureUnits','centimeters', ...
+  'defaultFigurePosition',[1 1 19 27], ...       % your A4 margin
+  'defaultAxesFontName','CMU Serif', ...
+  'defaultTextFontName','CMU Serif', ...
+  'defaultAxesTickLabelInterpreter','latex', ...
+  'defaultTextInterpreter','latex', ...
+  'defaultLegendInterpreter','latex', ...
+  'defaultAxesFontSize',10, ...
+  'defaultTextFontSize',10, ...
+  'defaultLegendFontSize',9);
+
+% → enlarged to use almost full A4 printable area:
+set(hFig, 'Units','centimeters', 'Position',[1 1 19 27]);
 
 set(hFig, ...
     'PaperSize',[21 29.7], ...
@@ -423,120 +461,150 @@ set(hFig, ...
     'PaperPositionMode','manual' ...
 );
 
-set(hFig, ...
-    'DefaultAxesFontSize', 10, ...
-    'DefaultTextFontSize', 10, ...
-    'DefaultLegendFontSize', 9 ...
-);
+colors = [ ...
+   0.1216   0.4667   0.7059;  % blue
+   1.0000   0.4980   0.0549;  % orange
+   0.5804   0.4039   0.7412;  % purple
+   0.8392   0.1529   0.1569;  % red
+   0.4980   0.4980   0.4980   % gray
+   0.5490   0.3373   0.2941;  % brown
+   0.8902   0.4667   0.7608;  % pink
+   0.1725   0.6275   0.1725;  % green
+];
 
 % Time vector
 t = t_vec;
 subplot(4,2,1); hold on
 hold on
-colors = lines(M);
 for m = 1:M
-    plot(x(2*m-1, :), x(2*m, :), '-o', 'MarkerSize', 1.5)
+    c = colors(m,:);
+    plot( x(2*m-1,:), x(2*m,:), '-o', ...
+          'Color',          c, ...
+          'MarkerSize',     0.9, ...
+          'HandleVisibility','off' );
     plot(x(2*m-1, 1), x(2*m, 1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off')
     plot(x(2*m-1, end), x(2*m, end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off')
 end
-xlabel('X [m]')
-ylabel('Y [m]')
-title('Robot Trajectories (Top View)')
+xlabel('$x$ [m]')
+ylabel('$y$ [m]')
+title(sprintf('\\textbf{Robot Trajectories (Top View)}'))
 axis([xmin xmax ymin ymax])
 % legend('Location','best')
 grid on
 hold off
 
 % Energy
-subplot(4,2,2)
-hold on 
+subplot(4,2,2);
+hold on
 for m = 1:M
-    plot(t, e(m,:), 'LineWidth',0.9)
+    plot( t, e(m,:), ...
+          'LineWidth', 0.9, ...
+          'Color',     colors(m,:), ...
+          'DisplayName', sprintf('Robot %d',m) );
 end
-xlabel('Time [s]')
-ylabel(sprintf('Percentage'))
-title(sprintf('Robot Energies'))
-ylim([0 1])
-grid on
+xlabel('Time [s]'); ylabel('Energy');
+title('\textbf{Robot Energies}');
+ylim([0 1]); grid on
+%legend('Location','best')
 hold off
 
-% Error covariance
-subplot(4,2,7)
+% State variances
+subplot(4,2,3)
 hold on 
-semilogy(t, squeeze(P(1,1,:)), 'LineWidth',0.9)
-semilogy(t, squeeze(P(3,3,:))+1e-3, 'LineWidth',0.9)
-semilogy(t, squeeze(P(5,5,:)), 'LineWidth',0.9)
-semilogy(t, squeeze(P(7,7,:)), 'LineWidth',0.9)
+plot(t, squeeze(P(1,1,:)), 'LineWidth',0.9, 'DisplayName','var($M_p$)', 'Color', colors(1,:))
+plot(t, squeeze(P(3,3,:)), 'LineWidth',0.9, 'DisplayName','var($\\beta$)', 'Color', colors(2,:))
+plot(t, squeeze(P(5,5,:)), 'LineWidth',0.9, 'DisplayName','var($x_s$)', 'Color', colors(3,:))
+plot(t, squeeze(P(7,7,:)), 'LineWidth',0.9, 'DisplayName','var($y_s$)', 'Color', colors(4,:))
 xlabel('Time [s]')
-ylabel(sprintf('Value'))
-title(sprintf('State Variances'))
+ylabel(sprintf('Variance'))
+title(sprintf('\\textbf{State Variances}'))
+legend('Location','southeast','Interpreter','latex')
 grid on
 hold off
 set(gca,'YScale','log')
+% 
+% % Slacks
+% tot_slack = e_low_slack + e_high_slack + b_slack + dist_slack;
+% subplot(4,2,8)
+% hold on 
+% for m = 1:M
+%     plot(t, e_low_slack(m,:), 'LineWidth',0.9)
+%     % plot(t, e_low_slack(m,:), 'LineWidth',0.9)
+%     % plot(t, e_high_slack(m,:), 'LineWidth',0.9)
+%     % plot(t, b_slack(m,:), 'LineWidth',0.9)
+%     % plot(t, dist_slack(m,:), 'LineWidth',0.9)
+% end
+% xlabel('Time [s]')
+% ylabel(sprintf('Value'))
+% title(sprintf('\\textbf{Slack Variables}'))
+% grid on
+% hold off
 
-% Slacks
-subplot(4,2,8)
-hold on 
+
+% Measurements
+subplot(4,2,4)
+hold on
 for m = 1:M
-    plot(t, e_low_slack(m,:), 'LineWidth',0.9)
-    plot(t, e_high_slack(m,:), 'LineWidth',0.9)
-    plot(t, b_slack(m,:), 'LineWidth',0.9)
-    plot(t, dist_slack(m,:), 'LineWidth',0.9)
+    % plot the noisy reading
+    plot(t, y(m,:),'Color', colors(m,:), 'LineWidth', 0.9, 'DisplayName', sprintf('Robot %d noisy', m));
+    % plot the corresponding true (noise-free) value
+    %plot(t, y_true(m,:),'--',      'LineWidth', 0.9, 'DisplayName', sprintf('Robot %d true',  m));
 end
 xlabel('Time [s]')
-ylabel(sprintf('Value'))
-title(sprintf('Slack Variables'))
+ylabel(sprintf('Measurement'))  
+title(sprintf('\\textbf{Robot Measurements}'))
+%legend('Interpreter','latex','Location','best')
 grid on
 hold off
 
 % State plot of M
-subplot(4,2,3)
+subplot(4,2,5)
 plot( t, z_real(1, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(1,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
-ylabel(sprintf('M'))
-title(sprintf('Process State M'))
+ylabel(sprintf('$M_p$'))
+title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([0 1000])
+ylim([0 1500])
 grid on
 hold off
 
 % State plot of beta
-subplot(4,2,4)
+subplot(4,2,6)
 plot( t, z_real(3, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(3,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
-ylabel(sprintf('\\beta'))
-title(sprintf('Process State \\beta'))
+ylabel(sprintf('$\\beta$'))
+title(sprintf('\\textbf{True and Estimate of $\\beta$}'))
 % legend('Location','best')
 grid on
 hold off
 
 % State plot of xs
-subplot(4,2,5)
+subplot(4,2,7)
 plot( t, z_real(5, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(5,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
-ylabel(sprintf('x_s'))
-title(sprintf('Process State x_s'))
+ylabel(sprintf('$x_s$'))
+title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
-ylim([xmin xmax])
+ylim([xmin-10 xmax+10])
 grid on
 hold off
 
 % State plot of ys
-subplot(4,2,6)
+subplot(4,2,8)
 plot( t, z_real(7, :),   'b-', 'LineWidth',0.9, 'DisplayName','True' )
 hold on
 plot( t, z_est_real(7,:), 'r--','LineWidth',0.9, 'DisplayName','Estimated' )
 xlabel('Time [s]')
-ylabel(sprintf('y_s'))
-title(sprintf('Process State y_s'))
+ylabel(sprintf('$y_s$'))
+title(sprintf('\\textbf{True and Estimate of $y_s$}'))
 % legend('Location','best')
-ylim([ymin ymax])
+ylim([xmin-10 xmax+10])
 grid on
 hold off
 
@@ -617,3 +685,42 @@ print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
 % grid(ax5,'on');
 % 
 % print(hFig,'myFigure.pdf','-dpdf','-bestfit');
+
+
+% after your simulation, you have
+% z_real(1,:) → M(t),     z_real(3,:) → β(t)
+% z_real(5,:) → x_s(t),   z_real(7,:) → y_s(t)
+% t = 1:K+1;
+% 
+% figure; hold on;
+% % 1) Path of the center
+% plot(z_real(5,t), z_real(7,t), 'k-', 'LineWidth',1.5);
+% 
+% % 2) Pick N points along the path
+% N = 20;
+% idx = round(linspace(1, K+1, N));
+% colormap(jet(N));
+% cmap = colormap;
+% 
+% for i = 1:N
+%     k = idx(i);
+%     r = z_real(3,k);               % circle radius ~ β
+%     Msize = z_real(1,k)/max(z_real(1,:))*200;  % bubble size ~ M
+%     % draw circle
+%     theta = linspace(0,2*pi,60);
+%     xc = z_real(5,k) + r*cos(theta);
+%     yc = z_real(7,k) + r*sin(theta);
+%     fill(xc, yc, cmap(i,:), 'FaceAlpha',0.2, 'EdgeColor','none');
+%     % center point colored by time
+%     scatter(z_real(5,k), z_real(7,k), Msize, cmap(i,:), 'filled');
+% end
+% 
+% % start/end markers
+% scatter(z_real(5,1), z_real(7,1), 100, 'g','^','filled');
+% scatter(z_real(5,end), z_real(7,end), 100, 'r','s','filled');
+% 
+% xlabel('x_s'); ylabel('y_s');
+% title('Leak center path with spread & mass bubbles');
+% axis equal; grid on;
+% colorbar('Ticks',linspace(0,1,5), 'TickLabels', ...
+%          arrayfun(@(x) sprintf('t=%.0f',t(round(x*(N-1))+1)), linspace(0,1,5),'uni',0));
