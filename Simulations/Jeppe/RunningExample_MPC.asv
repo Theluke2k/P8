@@ -57,10 +57,10 @@ z_est_0 = [M_0; M_dot_0; beta_0; beta_dot_0; xs_0; xs_dot_0; ys_0; ys_dot_0]; % 
 
 % Initial error covariance matrix
 P_0 = zeros(Nx_p);
-P_0(1,1) = (M_ref - M_0)^2;
-P_0(3,3) = (beta_ref - beta_0)^2;
-P_0(5,5) = (xs_ref - xs_0)^2;
-P_0(7,7) = (ys_ref - ys_0)^2;
+% P_0(1,1) = (M_ref - M_0)^2;
+% P_0(3,3) = (beta_ref - beta_0)^2;
+% P_0(5,5) = (xs_ref - xs_0)^2;
+% P_0(7,7) = (ys_ref - ys_0)^2;
 % P_0 = eye(Nx_p);
 
 % Initial robot positions, Z0 and control inputs, Uprev
@@ -203,7 +203,7 @@ z(:,1) = inv(T)*z_0;
 z_est(:,1) = inv(T)*z_est_0;
 x(:,1) = x_1;
 x(:,2) = x_1;
-P(:,:,1) = inv(T)*P_0*inv(T)';
+P(:,:,1) = P_0;
 
 %% Plotting preparation
 % Initializations
@@ -374,7 +374,7 @@ for k=2:K+1
         disp("")
     end
     [z_est(:,k), P(:,:,k), z_hat(:,k)] = EKF(z_est(:,k-1), P(:,:,k-1), A_sc, B_sc, u(:,k-1), Q, y(:,k), R, x(:,k), sc);
-    P_real(:,:,k) = T*P(:,:,k)*T';
+    P_real(:,:,k) = 
 
     % Package all Kalman filter information for MPC
     u_mpc = u(:,k:k+Hp);                % This could be avoided by removing DeltaT in B and in the u_beta calc.
@@ -540,23 +540,21 @@ ylim([0 1]); grid on
 %legend('Location','best')
 hold off
 
-% State MSEs
+% State variances
 subplot(4,2,3)
 hold on 
-plot(t, squeeze(P_real(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
-plot(t, squeeze(P_real(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
-plot(t, squeeze(P_real(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
-plot(t, squeeze(P_real(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
+plot(t, squeeze(P(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
+plot(t, squeeze(P(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
+plot(t, squeeze(P(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
+plot(t, squeeze(P(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
 xlabel('Time [s]')
 ylabel(sprintf('MSE'))
 title(sprintf('\\textbf{Process State MSE}'))
-lg = legend('Location','southeast','Interpreter','latex');
+lg = legend('Location','southeast','Interpreter','latex')
 lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
-set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])   % whatever values make sense for your data
-set(gca,'YScale','log')
 grid on
 hold off
-
+set(gca,'YScale','log')
 % 
 % % Slacks
 % tot_slack = e_low_slack + e_high_slack + b_slack + dist_slack;
@@ -601,7 +599,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$M_p$'))
 title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([0 700])
+ylim([0 1500])
 grid on
 hold off
 
@@ -626,7 +624,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$x_s$'))
 title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
-ylim([xmin xmax])
+ylim([xmin-10 xmax+10])
 grid on
 hold off
 
@@ -639,7 +637,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$y_s$'))
 title(sprintf('\\textbf{True and Estimate of $y_s$}'))
 % legend('Location','best')
-ylim([xmin xmax])
+ylim([xmin-10 xmax+10])
 grid on
 hold off
 
