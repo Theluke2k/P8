@@ -5,7 +5,7 @@ set(groot, 'defaultFigureUnits','pixels');
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 60;          % Simulation time [s]
+sim_time = 90;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -47,8 +47,8 @@ Nx_p = length(z_0); % Number of states in process state vector
 % Guessed initial process states
 M_0 = 150;
 beta_0 = 0.025;
-xs_0 = 10;
-ys_0 = 30;
+xs_0 = 15;
+ys_0 = 25;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -508,7 +508,9 @@ for m = 1:M
 end
 xlabel('Time [s]'); ylabel('Energy');
 title('\textbf{Robot Energies}');
-ylim([0 1]); grid on
+ylim([0 1]);
+xlim([0 sim_time])
+grid on
 %legend('Location','best')
 hold off
 
@@ -526,6 +528,7 @@ lg = legend('Location','southeast','Interpreter','latex');
 lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
 set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])   % whatever values make sense for your data
 set(gca,'YScale','log')
+xlim([0 sim_time])
 grid on
 hold off
 
@@ -542,6 +545,7 @@ xlabel('Time [s]')
 ylabel(sprintf('Measurement'))  
 title(sprintf('\\textbf{Robot Measurements}'))
 %legend('Interpreter','latex','Location','best')
+xlim([0 sim_time])
 grid on
 hold off
 
@@ -554,7 +558,8 @@ xlabel('Time [s]')
 ylabel(sprintf('$M_p$'))
 title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([0 700])
+ylim([-200 1000])
+xlim([0 sim_time])
 grid on
 hold off
 
@@ -567,6 +572,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$\\beta$'))
 title(sprintf('\\textbf{True and Estimate of $\\beta$}'))
 % legend('Location','best')
+xlim([0 sim_time])
 grid on
 hold off
 
@@ -580,6 +586,7 @@ ylabel(sprintf('$x_s$'))
 title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
 ylim([xmin xmax])
+xlim([0 sim_time])
 grid on
 hold off
 
@@ -593,6 +600,7 @@ ylabel(sprintf('$y_s$'))
 title(sprintf('\\textbf{True and Estimate of $y_s$}'))
 % legend('Location','best')
 ylim([xmin xmax])
+xlim([0 sim_time])
 grid on
 hold off
 
