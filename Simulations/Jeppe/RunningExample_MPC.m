@@ -510,6 +510,7 @@ xlabel('Time [s]'); ylabel('Energy');
 title('\textbf{Robot Energies}');
 ylim([0 1]);
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 %legend('Location','best')
 hold off
@@ -526,7 +527,7 @@ ylabel(sprintf('MSE'))
 title(sprintf('\\textbf{Process State MSE}'))
 lg = legend('Location','southeast','Interpreter','latex');
 lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
-set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])   % whatever values make sense for your data
+set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
 set(gca,'YScale','log')
 xlim([0 sim_time])
 grid on
@@ -546,6 +547,7 @@ ylabel(sprintf('Measurement'))
 title(sprintf('\\textbf{Robot Measurements}'))
 %legend('Interpreter','latex','Location','best')
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
@@ -560,6 +562,7 @@ title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
 ylim([-200 1000])
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
@@ -573,6 +576,7 @@ ylabel(sprintf('$\\beta$'))
 title(sprintf('\\textbf{True and Estimate of $\\beta$}'))
 % legend('Location','best')
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
@@ -587,6 +591,7 @@ title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
 ylim([xmin xmax])
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
@@ -601,6 +606,7 @@ title(sprintf('\\textbf{True and Estimate of $y_s$}'))
 % legend('Location','best')
 ylim([xmin xmax])
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
