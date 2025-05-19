@@ -530,6 +530,7 @@ lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
 set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
 set(gca,'YScale','log')
 xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
