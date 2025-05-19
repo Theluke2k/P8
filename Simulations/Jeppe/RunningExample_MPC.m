@@ -5,7 +5,7 @@ set(groot, 'defaultFigureUnits','pixels');
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 60;          % Simulation time [s]
+sim_time = 90;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -45,10 +45,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 300;
-beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+M_0 = 150;
+beta_0 = 0.025;
+xs_0 = 15;
+ys_0 = 25;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -212,7 +212,6 @@ y_axis = linspace(ymin,ymax,50)';   % Process y-axis
 z_values_true = get_h(z(:,1),x_axis,y_axis,sc);    % Process values in defined area
 z_values_est = get_h(z_est(:,1), x_axis, y_axis,sc);
 t_vec = (0:K) * dt;               % Time vector for plotting
-%colors = {'b','r','g','k','y','c','m','b'};     % valid MATLAB colors
 colors = [ ...
    0.1216   0.4667   0.7059;  % blue
    1.0000   0.4980   0.0549;  % orange
@@ -223,18 +222,6 @@ colors = [ ...
    0.8902   0.4667   0.7608;  % pink
    0.1725   0.6275   0.1725;  % green
 ];
-% colors = [ ...
-%   228,  26,  28;
-%   55,  126, 184;
-%   77,  175,  74;
-%   152,  78, 163;
-%   255, 127,   0;
-%   255, 255,  51;
-%   166,  86,  40;
-%   247, 129, 191
-% ] / 255;
-
-
 
 % Initialize plotting objects that can be updated 
 process_plot_true = gobjects(1,1);         
@@ -438,10 +425,6 @@ dist_slack(:,end) = [];
 % Figure settings
 hFig = figure;
 
-% original (20×14 cm)  
-% set(hFig, 'Units','centimeters', 'Position',[5 5 20 14]);
-
-% put this right at the top of your script, before figure()
 set(groot, ...
   'defaultFigureUnits','centimeters', ...
   'defaultFigurePosition',[1 1 19 27], ...       % your A4 margin
@@ -463,17 +446,6 @@ set(hFig, ...
     'PaperPosition',[1 1 19 27.7], ...
     'PaperPositionMode','manual' ...
 );
-
-colors = [ ...
-   0.1216   0.4667   0.7059;  % blue
-   1.0000   0.4980   0.0549;  % orange
-   0.5804   0.4039   0.7412;  % purple
-   0.8392   0.1529   0.1569;  % red
-   0.4980   0.4980   0.4980   % gray
-   0.5490   0.3373   0.2941;  % brown
-   0.8902   0.4667   0.7608;  % pink
-   0.1725   0.6275   0.1725;  % green
-];
 
 % Time vector
 t = t_vec;
@@ -557,25 +529,6 @@ set(gca,'YScale','log')
 grid on
 hold off
 
-% 
-% % Slacks
-% tot_slack = e_low_slack + e_high_slack + b_slack + dist_slack;
-% subplot(4,2,8)
-% hold on 
-% for m = 1:M
-%     plot(t, e_low_slack(m,:), 'LineWidth',0.9)
-%     % plot(t, e_low_slack(m,:), 'LineWidth',0.9)
-%     % plot(t, e_high_slack(m,:), 'LineWidth',0.9)
-%     % plot(t, b_slack(m,:), 'LineWidth',0.9)
-%     % plot(t, dist_slack(m,:), 'LineWidth',0.9)
-% end
-% xlabel('Time [s]')
-% ylabel(sprintf('Value'))
-% title(sprintf('\\textbf{Slack Variables}'))
-% grid on
-% hold off
-
-
 % Measurements
 subplot(4,2,4)
 hold on
@@ -644,118 +597,3 @@ grid on
 hold off
 
 print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
-
-% hFig = figure;
-% set(hFig, 'Units','centimeters', 'Position',[5 5 20 14], ...
-%           'PaperSize',[21 29.7], 'PaperOrientation','portrait', ...
-%           'PaperPosition',[1 1 19 27.7], 'PaperPositionMode','manual', ...
-%           'DefaultAxesFontSize',10, 'DefaultTextFontSize',10, ...
-%           'DefaultLegendFontSize',9);
-% 
-% t = tiledlayout(6,4, ...
-%      'TileSpacing','compact', ...   % remove gaps between tiles
-%      'Padding','none');             % remove outer margins
-% 
-% ax1 = nexttile(1, [2 2]);
-% plot(ax1, t_vec, z_real(1,:),   'b-', 'LineWidth',0.9, 'DisplayName','True');
-% hold(ax1,'on');
-% plot(ax1, t_vec, z_est_real(1,:),'r--','LineWidth',0.9, 'DisplayName','Estimated');
-% hold(ax1,'off');
-% title(ax1,'Process State M');
-% xlabel(ax1,'Time [s]');
-% ylabel(ax1,'M');
-% ylim(ax1,[0 1000]);
-% legend(ax1,'Location','best');
-% grid(ax1,'on');
-% 
-% ax2 = nexttile(3, [2 2]);
-% plot(ax2, t_vec, z_real(3,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
-% hold(ax2,'on');
-% plot(ax2, t_vec, z_est_real(3,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
-% hold(ax2,'off');
-% title(ax2,'Process State \beta');
-% xlabel(ax2,'Time [s]');
-% ylabel(ax2,'\beta');
-% legend(ax2,'Location','best');
-% grid(ax2,'on');
-% 
-% ax3 = nexttile(9, [2 2]);
-% plot(ax3, t_vec, z_real(5,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
-% hold(ax3,'on');
-% plot(ax3, t_vec, z_est_real(5,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
-% hold(ax3,'off');
-% title(ax3,'Process State x_s');
-% xlabel(ax3,'Time [s]');
-% ylabel(ax3,'x_s');
-% ylim(ax3,[xmin xmax]);
-% legend(ax3,'Location','best');
-% grid(ax3,'on');
-% 
-% ax4 = nexttile(11, [2 2]);
-% plot(ax4, t_vec, z_real(7,:),   'b-', 'LineWidth',0.9,'DisplayName','True');
-% hold(ax4,'on');
-% plot(ax4, t_vec, z_est_real(7,:),'r--','LineWidth',0.9,'DisplayName','Estimated');
-% hold(ax4,'off');
-% title(ax4,'Process State y_s');
-% xlabel(ax4,'Time [s]');
-% ylabel(ax4,'y_s');
-% ylim(ax4,[ymin ymax]);
-% legend(ax4,'Location','best');
-% grid(ax4,'on');
-% 
-% ax5 = nexttile(18, [2 2]);
-% hold(ax5,'on');
-% colors = lines(M);
-% for m = 1:M
-%     plot(ax5, x(2*m-1,:), x(2*m,:), '-o', 'Color',colors(m,:), 'LineWidth',1);
-%     plot(ax5, x(2*m-1,1), x(2*m,1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off');
-%     plot(ax5, x(2*m-1,end), x(2*m,end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off');
-% end
-% hold(ax5,'off');
-% axis(ax5,[xmin xmax ymin ymax]);
-% xlabel(ax5,'X [m]');
-% ylabel(ax5,'Y [m]');
-% title(ax5,'Robot Trajectories (Top View)');
-% legend(ax5,'Location','best');
-% grid(ax5,'on');
-% 
-% print(hFig,'myFigure.pdf','-dpdf','-bestfit');
-
-
-% after your simulation, you have
-% z_real(1,:) → M(t),     z_real(3,:) → β(t)
-% z_real(5,:) → x_s(t),   z_real(7,:) → y_s(t)
-% t = 1:K+1;
-% 
-% figure; hold on;
-% % 1) Path of the center
-% plot(z_real(5,t), z_real(7,t), 'k-', 'LineWidth',1.5);
-% 
-% % 2) Pick N points along the path
-% N = 20;
-% idx = round(linspace(1, K+1, N));
-% colormap(jet(N));
-% cmap = colormap;
-% 
-% for i = 1:N
-%     k = idx(i);
-%     r = z_real(3,k);               % circle radius ~ β
-%     Msize = z_real(1,k)/max(z_real(1,:))*200;  % bubble size ~ M
-%     % draw circle
-%     theta = linspace(0,2*pi,60);
-%     xc = z_real(5,k) + r*cos(theta);
-%     yc = z_real(7,k) + r*sin(theta);
-%     fill(xc, yc, cmap(i,:), 'FaceAlpha',0.2, 'EdgeColor','none');
-%     % center point colored by time
-%     scatter(z_real(5,k), z_real(7,k), Msize, cmap(i,:), 'filled');
-% end
-% 
-% % start/end markers
-% scatter(z_real(5,1), z_real(7,1), 100, 'g','^','filled');
-% scatter(z_real(5,end), z_real(7,end), 100, 'r','s','filled');
-% 
-% xlabel('x_s'); ylabel('y_s');
-% title('Leak center path with spread & mass bubbles');
-% axis equal; grid on;
-% colorbar('Ticks',linspace(0,1,5), 'TickLabels', ...
-%          arrayfun(@(x) sprintf('t=%.0f',t(round(x*(N-1))+1)), linspace(0,1,5),'uni',0));
