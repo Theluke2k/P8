@@ -5,7 +5,7 @@ set(groot, 'defaultFigureUnits','pixels');
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 90;          % Simulation time [s]
+sim_time = 60;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -47,8 +47,8 @@ Nx_p = length(z_0); % Number of states in process state vector
 % Guessed initial process states
 M_0 = 150;
 beta_0 = 0.025;
-xs_0 = 15;
-ys_0 = 25;
+xs_0 = 10;
+ys_0 = 30;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
