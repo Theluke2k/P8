@@ -35,8 +35,8 @@ map_bounds = [xmin, xmax, ymin, ymax];
 % True initial process states
 M_ref = 300;
 beta_ref = 0.05;
-xs_ref = 20;
-ys_ref = 20;
+xs_ref = 30;
+ys_ref = 30;
 M_dot_ref = 0;
 beta_dot_ref = 0;
 xs_dot_ref = 0;
@@ -47,8 +47,8 @@ Nx_p = length(z_0); % Number of states in process state vector
 % Guessed initial process states
 M_0 = 150;
 beta_0 = 0.025;
-xs_0 = 15;
-ys_0 = 25;
+xs_0 = 10;
+ys_0 = 10;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -590,7 +590,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$x_s$'))
 title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
-ylim([xmin xmax])
+ylim([xmin-10 xmax])
 xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
