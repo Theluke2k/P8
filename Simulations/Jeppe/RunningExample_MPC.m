@@ -635,6 +635,62 @@ set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
-
-
 print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
+
+
+
+% EXTRA PLOTTING
+hFig2 = figure;
+
+% Time vector
+t = t_vec;
+subplot(4,2,1);
+hold on
+plot( z_real(5,:), z_real(7,:), 'k--', ...
+                'LineWidth', 1, ...
+                'DisplayName','\textbf{True Center}' );
+for m = 1:M
+    c = colors(m,:);
+    plot( x(2*m-1,:), x(2*m,:), '-o', ...
+          'Color',          c, ...
+          'MarkerSize',     0.9, ...
+          'HandleVisibility','off' );
+    plot(x(2*m-1, 1), x(2*m, 1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off')
+    plot(x(2*m-1, end), x(2*m, end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off')
+end
+plot( z_real(5,1), z_real(7,1), 'go', ...
+                'MarkerFaceColor','g', ...
+                'MarkerSize', 4);
+plot( z_real(5,end), z_real(7,end), 'ro', ...
+                'MarkerFaceColor','r', ...
+                'MarkerSize', 4);
+
+hCenterLeg = plot(NaN,NaN,'k--', ...
+                  'LineWidth', 1, ...        % small in legend
+                  'DisplayName','Center');
+
+%    — small start marker in legend
+hStartLeg  = plot(NaN,NaN,'go', ...
+                  'MarkerSize',4, ...           % small in legend
+                  'MarkerFaceColor','g', ...
+                  'DisplayName','Start');
+
+%    — small end marker in legend
+hEndLeg    = plot(NaN,NaN,'ro', ...
+                  'MarkerSize',4, ...           % small in legend
+                  'MarkerFaceColor','r', ...
+                  'DisplayName','End');
+xlabel('$x$ [m]')
+ylabel('$y$ [m]')
+title(sprintf('\\textbf{Robot Trajectories (Long Horizons)}'))
+axis([xmin-2 xmax ymin-2 ymax])
+lg = legend([hCenterLeg,hStartLeg,hEndLeg], ...
+       'Location','southeast', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+grid on
+hold off
+
+ % save as PDF
+print(hFig2, 'RobotTrajectories.pdf', '-dpdf', '-bestfit');
