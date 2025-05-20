@@ -180,7 +180,7 @@ Nu_r = size(B_r_single,2);
 e = zeros(M,K+1);
 e(:,1) = ones(M,1)*0.8;     % Robots fully charged at time 0
 charge_control = ones(M,K+1);
-charge_control(:,1) = zeros(M,1);
+charge_control(:,1) = zeros(M,1);       % MISTAKE, BUT TOO LATE TO REMOVE NOW :( (should just be deleted)
 
 % Charging params
 h_ch = 5; % Size of station
