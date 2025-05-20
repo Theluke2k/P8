@@ -708,16 +708,22 @@ for m = 1:M
           'DisplayName', sprintf('Robot %d',m) );
 end
 xlabel('Time [s]'); ylabel('Energy');
-title('\textbf{Robot Energies}');
+title('\textbf{Robot Energies (Short Horizon)}');
 ylim([0 1]);
 xlim([0 sim_time])
 set(gca,'XTick',[0 2 4 6 8 10 12 14 16 18 20])
 grid on
+box on
 %legend('Location','best')
 hold off
 
+ % save as PDF
+print(hFig3, 'EnergyLevel.pdf', '-dpdf', '-bestfit');
+
+
+hFig4 = figure;
 % Cost plot
-subplot(4,2,2)
+subplot(4,2,1)
 plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
 hold on
 plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
@@ -725,7 +731,7 @@ plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
 plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
 xlabel('Time [s]')
 ylabel(sprintf('Cost'))
-title(sprintf('\\textbf{Weighted Costs}'))
+title(sprintf('\\textbf{Weighted Costs (Short Horizon)}'))
 xlim([0 sim_time])
 allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
 ylim([1e-7 max(allcosts)*10])
@@ -740,4 +746,4 @@ grid on
 hold off
 
  % save as PDF
-print(hFig3, 'EnergyLevel.pdf', '-dpdf', '-bestfit');
+print(hFig4, 'CostPlot.pdf', '-dpdf', '-bestfit');
