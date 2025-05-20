@@ -515,22 +515,45 @@ grid on
 %legend('Location','best')
 hold off
 
-% State MSEs
+% % State MSEs
+% subplot(4,2,3)
+% hold on 
+% plot(t, squeeze(P_real(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
+% plot(t, squeeze(P_real(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
+% plot(t, squeeze(P_real(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
+% plot(t, squeeze(P_real(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
+% xlabel('Time [s]')
+% ylabel(sprintf('MSE'))
+% title(sprintf('\\textbf{Process State MSE}'))
+% lg = legend('Location','southeast','Interpreter','latex');
+% lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+% set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
+% set(gca,'YScale','log')
+% xlim([0 sim_time])
+% set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
+% grid on
+% hold off
+
+% Cost plot
 subplot(4,2,3)
-hold on 
-plot(t, squeeze(P_real(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
-plot(t, squeeze(P_real(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
-plot(t, squeeze(P_real(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
-plot(t, squeeze(P_real(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
+plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
+hold on
+plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
+plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
+plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
 xlabel('Time [s]')
-ylabel(sprintf('MSE'))
-title(sprintf('\\textbf{Process State MSE}'))
-lg = legend('Location','southeast','Interpreter','latex');
-lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+ylabel(sprintf('Cost'))
+title(sprintf('\\textbf{Weighted Costs}'))
+xlim([0 sim_time])
+allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
+ylim([0 max(allcosts)*10])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
 set(gca,'YScale','log')
-xlim([0 sim_time])
-set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
+lg = legend('Location','best', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [9, 10];    % e.g. [length height] in pixels
 grid on
 hold off
 
