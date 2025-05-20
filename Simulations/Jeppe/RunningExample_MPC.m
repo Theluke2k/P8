@@ -23,7 +23,7 @@ rng(57)
 Hp = 8;             % Prediction horizon
 Hu = 8;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [0.1, 100, 1, 1e3];    % DeltaU, KF, Energy, Slack
+cost_params = [0.1, 100, 0.001, 1e3];    % DeltaU, KF, Energy, Slack
 min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
@@ -35,8 +35,8 @@ map_bounds = [xmin, xmax, ymin, ymax];
 % True initial process states
 M_ref = 300;
 beta_ref = 0.05;
-xs_ref = 20;
-ys_ref = 20;
+xs_ref = 25;
+ys_ref = 25;
 M_dot_ref = 0;
 beta_dot_ref = 0;
 xs_dot_ref = 0;
@@ -45,9 +45,9 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 150;
-beta_0 = 0.025;
-xs_0 = 15;
+M_0 = 600;
+beta_0 = 0.03;
+xs_0 = 25;
 ys_0 = 25;
 M_dot_0 = 0;
 beta_dot_0 = 0;
@@ -65,10 +65,17 @@ P_0(7,7) = (ys_ref - ys_0)^2;
 
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
-for m = 1:M
-    x_1(2*m-1) = m;
-    x_1(2*m) = 0;
-end
+% for m = 1:M
+%     x_1(2*m-1) = m;
+%     x_1(2*m) = 0;
+% end
+x_1(1) = 0;
+x_1(2) = 1;
+x_1(3) = 1;
+x_1(4) = 1;
+x_1(5) = 1;
+x_1(6) = 0;
+
 U_prev = zeros(2*M,1);           % (2*M values again)
 
 % MPC Tuning
