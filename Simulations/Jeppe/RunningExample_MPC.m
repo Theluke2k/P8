@@ -20,8 +20,8 @@ T = diag(sc);
 rng(57)
 
 % MPC parameters
-Hp = 8;             % Prediction horizon
-Hu = 8;             % Control horizon
+Hp = 3;             % Prediction horizon
+Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [0.1, 100, 1, 1e3];    % DeltaU, KF, Energy, Slack
 min_dist = 1;                  % Minimum distance between robots
@@ -578,7 +578,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$M_p$'))
 title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([0 700])
+ylim([-100 1000])
 xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
