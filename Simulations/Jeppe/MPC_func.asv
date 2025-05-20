@@ -1,4 +1,4 @@
-function [X_opt,U_opt,P_trace, sol, charge_control, costs] = MPC_func(rob_init, kf_init, en_params, tuning, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev, sc)
+function [X_opt,U_opt,P_trace, sol, charge_control, cost] = MPC_func(rob_init, kf_init, en_params, tuning, mpc_params, cost_params, n_robots, map_bounds, min_dist, sim_params, verbose_opt, do_warm_start, sol_prev, sc)
 %% Parameters
 import casadi.*
 
@@ -311,5 +311,6 @@ U_opt = sol.value(x_rd(2*M+1:end,:));
 P_trace = 0;
 %charge_control = sol.value(v(:,1));
 charge_control = ones(M,1);
-costs = {sol.value(lambda1*cost), sol.value(lambda2*cost_KF), sol.value(lambda3*cost_energy), sol.value(lambda4*cost_slack)};
+slacks = {sol.value(e_low_slack(:,2)), sol.value(e_high_slack(:,2)), sol.value(b_slack(:,2)), sol.value(slack_dist(:,2))};
+
 end
