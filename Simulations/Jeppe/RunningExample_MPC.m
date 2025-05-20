@@ -133,7 +133,7 @@ mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
 
 % Measurement noise
-sigma_measurement = 1e-6;
+sigma_measurement = 0.1;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
 
@@ -319,10 +319,10 @@ z_est_real(:,1) = z_est_0;
 P_real = zeros(Nx_p,Nx_p,K+1);
 
 % Offline plotting varialbes
-e_low_slack = zeros(M,K+1);     % Slack on lower energy bound
-e_high_slack = zeros(M,K+1);    % Slack on higher energy bound
-b_slack = zeros(M,K+1);         % Slack on energy barrier
-dist_slack = zeros(M,K+1);      % Slack on minimum collision distance
+cost_deltaU = zeros(K+1,1);     % Slack on lower energy bound
+cost_KF = zeros(K+1,1);    % Slack on higher energy bound
+cost_energy = zeros(K+1,1);         % Slack on energy barrier
+cost_slack = zeros(K+1,1);      % Slack on minimum collision distance
 
 % MAIN SIMULATION LOOP
 for k=2:K+1
@@ -375,17 +375,17 @@ for k=2:K+1
     EN_params = {e(:,k), en_charge, en_cons, cx, cy};
     
     % Compute optimal stuff
-    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k), slacks] = MPC_func(ROB_params, KF_params, EN_params, mpc_tuning, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
+    [X_opt, U_opt, P_trace, sol_prev, charge_control(:,k), costs] = MPC_func(ROB_params, KF_params, EN_params, mpc_tuning, mpc_params, cost_params, M, map_bounds, min_dist, sim_params, 2, do_warm_start, sol_prev, sc);
     u_opt = U_opt(:,2);
 
     % set warm start to 1 after first iteration
     do_warm_start = 1; 
     
     % Insert slack variables into respective variables for later plotting
-    e_low_slack(:,k+1) = slacks{1};
-    e_high_slack(:,k+1) = slacks{2};
-    b_slack(:,k+1) = slacks{3};
-    dist_slack(:,k+1) = slacks{4};
+    cost_deltaU(k) = costs{1};
+    cost_KF(k) = costs{2};
+    cost_energy(k) = costs{3};
+    cost_slack(k) = costs{4};
 
     % Update process plot
     %subplot(1,2,1)
@@ -412,12 +412,6 @@ for k=2:K+1
     end
     drawnow limitrate
 end
-
-% Cut off last column of slack variables before plotting
-e_low_slack(:,end) = [];
-e_high_slack(:,end) = [];
-b_slack(:,end) = [];
-dist_slack(:,end) = [];
 
 %% Plotting After Finish
 %close all
@@ -515,22 +509,45 @@ grid on
 %legend('Location','best')
 hold off
 
-% State MSEs
+% % State MSEs
+% subplot(4,2,3)
+% hold on 
+% plot(t, squeeze(P_real(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
+% plot(t, squeeze(P_real(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
+% plot(t, squeeze(P_real(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
+% plot(t, squeeze(P_real(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
+% xlabel('Time [s]')
+% ylabel(sprintf('MSE'))
+% title(sprintf('\\textbf{Process State MSE}'))
+% lg = legend('Location','southeast','Interpreter','latex');
+% lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+% set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
+% set(gca,'YScale','log')
+% xlim([0 sim_time])
+% set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
+% grid on
+% hold off
+
+% Cost plot
 subplot(4,2,3)
-hold on 
-plot(t, squeeze(P_real(1,1,:)), 'LineWidth',0.9, 'DisplayName','$M_p$', 'Color', colors(1,:))
-plot(t, squeeze(P_real(3,3,:)), 'LineWidth',0.9, 'DisplayName','$\beta$', 'Color', colors(2,:))
-plot(t, squeeze(P_real(5,5,:)), 'LineWidth',0.9, 'DisplayName','$x_s$', 'Color', colors(3,:))
-plot(t, squeeze(P_real(7,7,:)), 'LineWidth',0.9, 'DisplayName','$y_s$', 'Color', colors(4,:))
+plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
+hold on
+plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
+plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
+plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
 xlabel('Time [s]')
-ylabel(sprintf('MSE'))
-title(sprintf('\\textbf{Process State MSE}'))
-lg = legend('Location','southeast','Interpreter','latex');
-lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+ylabel(sprintf('Cost'))
+title(sprintf('\\textbf{Weighted Costs}'))
+xlim([0 sim_time])
+allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
+ylim([1e-7 max(allcosts)*10])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
 set(gca,'YScale','log')
-xlim([0 sim_time])
-set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
+lg = legend('Location','best', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [9, 10];    % e.g. [length height] in pixels
 grid on
 hold off
 
@@ -610,5 +627,7 @@ xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
+
+
 
 print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
