@@ -305,6 +305,10 @@ catch
     disp("")
 end
 
+if(sol.value(lambda4*cost_slack) > 1)
+    disp('check this out')
+end
+
 % Outputs
 X_opt = sol.value(x_rd(1:2*M,:));
 U_opt = sol.value(x_rd(2*M+1:end,:));

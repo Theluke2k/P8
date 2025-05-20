@@ -585,7 +585,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$M_p$'))
 title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([-100 1000])
+ylim([0 800])
 xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
