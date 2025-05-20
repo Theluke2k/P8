@@ -695,7 +695,7 @@ hold off
  % save as PDF
 print(hFig2, 'RobotTrajectories.pdf', '-dpdf', '-bestfit');
 
-% EXTRA PLOTTING
+
 hFig3 = figure;
 
 % Time vector
