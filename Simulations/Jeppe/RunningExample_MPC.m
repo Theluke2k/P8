@@ -5,7 +5,7 @@ set(groot, 'defaultFigureUnits','pixels');
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 60;          % Simulation time [s]
+sim_time = 20;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -694,3 +694,52 @@ hold off
 
  % save as PDF
 print(hFig2, 'RobotTrajectories.pdf', '-dpdf', '-bestfit');
+
+% EXTRA PLOTTING
+hFig3 = figure;
+
+% Time vector
+t = t_vec;
+% Energy
+subplot(4,2,1);
+hold on
+for m = 1:M
+    plot( t, e(m,:), ...
+          'LineWidth', 0.9, ...
+          'Color',     colors(m,:), ...
+          'DisplayName', sprintf('Robot %d',m) );
+end
+xlabel('Time [s]'); ylabel('Energy');
+title('\textbf{Robot Energies}');
+ylim([0 1]);
+xlim([0 sim_time])
+set(gca,'XTick',[0 2 4 6 8 10 12 14 16 18 20])
+grid on
+%legend('Location','best')
+hold off
+
+% Cost plot
+subplot(4,2,2)
+plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
+hold on
+plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
+plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
+plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
+xlabel('Time [s]')
+ylabel(sprintf('Cost'))
+title(sprintf('\\textbf{Weighted Costs}'))
+xlim([0 sim_time])
+allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
+ylim([1e-7 max(allcosts)*10])
+set(gca,'XTick',[0 2 4 6 8 10 12 14 16 18 20])
+set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
+set(gca,'YScale','log')
+lg = legend('Location','southeast', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [9, 10];    % e.g. [length height] in pixels
+grid on
+hold off
+
+ % save as PDF
+print(hFig3, 'EnergyLevel.pdf', '-dpdf', '-bestfit');

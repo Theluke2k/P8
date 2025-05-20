@@ -5,7 +5,7 @@ set(groot, 'defaultFigureUnits','pixels');
 % General simulation parameters
 M = 3;                  % Number of robots
 dt = 0.5;               % Sampling period [s]
-sim_time = 60;          % Simulation time [s]
+sim_time = 20;          % Simulation time [s]
 K = sim_time/dt;        % Total # of simulation steps
 Ts = 0.5;                 % MPC sampling period
 sim_params = [Ts, dt];
@@ -20,10 +20,10 @@ T = diag(sc);
 rng(57)
 
 % MPC parameters
-Hp = 3;             % Prediction horizon
-Hu = 3;             % Control horizon
+Hp = 8;             % Prediction horizon
+Hu = 8;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [0.1, 100, 1, 1e3];    % DeltaU, KF, Energy, Slack
+cost_params = [0.1, 100, 0.01, 1e3];    % DeltaU, KF, Energy, Slack
 min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
@@ -35,8 +35,8 @@ map_bounds = [xmin, xmax, ymin, ymax];
 % True initial process states
 M_ref = 300;
 beta_ref = 0.05;
-xs_ref = 20;
-ys_ref = 20;
+xs_ref = 25;
+ys_ref = 25;
 M_dot_ref = 0;
 beta_dot_ref = 0;
 xs_dot_ref = 0;
@@ -45,10 +45,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 300;
-beta_0 = 0.05;
-xs_0 = 20;
-ys_0 = 20;
+M_0 = 600;
+beta_0 = 0.03;
+xs_0 = 25;
+ys_0 = 25;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
@@ -65,10 +65,17 @@ P_0(7,7) = (ys_ref - ys_0)^2;
 
 % Initial robot positions, Z0 and control inputs, Uprev
 x_1 = zeros(2*M,1); % (assuming M=4, so 2*M values)
-for m = 1:M
-    x_1(2*m-1) = m;
-    x_1(2*m) = 0;
-end
+% for m = 1:M
+%     x_1(2*m-1) = m;
+%     x_1(2*m) = 0;
+% end
+x_1(1) = 0;
+x_1(2) = 1;
+x_1(3) = 1;
+x_1(4) = 1;
+x_1(5) = 1;
+x_1(6) = 0;
+
 U_prev = zeros(2*M,1);           % (2*M values again)
 
 % MPC Tuning
@@ -133,7 +140,7 @@ mu_w = zeros(length(v),1);
 Q = (inv(T)*G)*diag([sigma_M^2 sigma_beta^2 sigma_x^2 sigma_y^2])*(inv(T)*G)'; % This is the process noise covariance matrix
 
 % Measurement noise
-sigma_measurement = 1e-6;
+sigma_measurement = 0.1;
 mu_r = zeros(M,1);
 R = sigma_measurement^2*eye(M); % measurement noise covariance
 
@@ -381,7 +388,7 @@ for k=2:K+1
     % set warm start to 1 after first iteration
     do_warm_start = 1; 
     
-    % Insert slack variables into respective variables for later plotting
+    % Insert cost variables into respective variables for later plotting
     cost_deltaU(k) = costs{1};
     cost_KF(k) = costs{2};
     cost_energy(k) = costs{3};
@@ -530,20 +537,21 @@ hold off
 
 % Cost plot
 subplot(4,2,3)
-plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Robot input')
+plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
 hold on
-plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Un')
+plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
 plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
 plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
 xlabel('Time [s]')
-ylabel(sprintf('$y_s$'))
-title(sprintf('\\textbf{True and Estimate of $y_s$}'))
-% legend('Location','best')
+ylabel(sprintf('Cost'))
+title(sprintf('\\textbf{Weighted Costs}'))
 xlim([0 sim_time])
+allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
+ylim([1e-7 max(allcosts)*10])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
 set(gca,'YScale','log')
-lg = legend('Location','best', ...
+lg = legend('Location','southeast', ...
        'Interpreter','latex', ...
        'FontSize',7);
 lg.ItemTokenSize = [9, 10];    % e.g. [length height] in pixels
@@ -577,7 +585,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$M_p$'))
 title(sprintf('\\textbf{True and Estimate of $M_p$}'))
 %legend('Location','best')
-ylim([-200 1000])
+ylim([0 700])
 xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
@@ -606,7 +614,7 @@ xlabel('Time [s]')
 ylabel(sprintf('$x_s$'))
 title(sprintf('\\textbf{True and Estimate of $x_s$}'))
 % legend('Location','best')
-ylim([xmin-10 xmax])
+ylim([xmin xmax])
 xlim([0 sim_time])
 set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
@@ -627,6 +635,111 @@ set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
 grid on
 hold off
 
-
-
 print(hFig, 'myFigure.pdf', '-dpdf', '-bestfit');
+
+
+
+% EXTRA PLOTTING
+hFig2 = figure;
+
+% Time vector
+t = t_vec;
+subplot(4,2,1);
+hold on
+plot( z_real(5,:), z_real(7,:), 'k--', ...
+                'LineWidth', 1, ...
+                'DisplayName','\textbf{True Center}' );
+for m = 1:M
+    c = colors(m,:);
+    plot( x(2*m-1,:), x(2*m,:), '-o', ...
+          'Color',          c, ...
+          'MarkerSize',     0.9, ...
+          'HandleVisibility','off' );
+    plot(x(2*m-1, 1), x(2*m, 1), 'go', 'MarkerFaceColor', 'g', 'MarkerSize', 3, 'HandleVisibility', 'off')
+    plot(x(2*m-1, end), x(2*m, end), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 3, 'HandleVisibility', 'off')
+end
+plot( z_real(5,1), z_real(7,1), 'go', ...
+                'MarkerFaceColor','g', ...
+                'MarkerSize', 4);
+plot( z_real(5,end), z_real(7,end), 'ro', ...
+                'MarkerFaceColor','r', ...
+                'MarkerSize', 4);
+
+hCenterLeg = plot(NaN,NaN,'k--', ...
+                  'LineWidth', 1, ...        % small in legend
+                  'DisplayName','Center');
+
+%    — small start marker in legend
+hStartLeg  = plot(NaN,NaN,'go', ...
+                  'MarkerSize',4, ...           % small in legend
+                  'MarkerFaceColor','g', ...
+                  'DisplayName','Start');
+
+%    — small end marker in legend
+hEndLeg    = plot(NaN,NaN,'ro', ...
+                  'MarkerSize',4, ...           % small in legend
+                  'MarkerFaceColor','r', ...
+                  'DisplayName','End');
+xlabel('$x$ [m]')
+ylabel('$y$ [m]')
+title(sprintf('\\textbf{Robot Trajectories (Long Horizons)}'))
+axis([xmin-2 xmax ymin-2 ymax])
+lg = legend([hCenterLeg,hStartLeg,hEndLeg], ...
+       'Location','southeast', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [12, 10];    % e.g. [length height] in pixels
+grid on
+hold off
+
+ % save as PDF
+print(hFig2, 'RobotTrajectories.pdf', '-dpdf', '-bestfit');
+
+% EXTRA PLOTTING
+hFig3 = figure;
+
+% Time vector
+t = t_vec;
+% Energy
+subplot(4,2,1);
+hold on
+for m = 1:M
+    plot( t, e(m,:), ...
+          'LineWidth', 0.9, ...
+          'Color',     colors(m,:), ...
+          'DisplayName', sprintf('Robot %d',m) );
+end
+xlabel('Time [s]'); ylabel('Energy');
+title('\textbf{Robot Energies}');
+ylim([0 1]);
+xlim([0 sim_time])
+set(gca,'XTick',[0 10 20 30 40 50 60 70 80 90 100 110 120])
+grid on
+%legend('Location','best')
+hold off
+
+% Cost plot
+subplot(4,2,2)
+plot( t, cost_deltaU(:), 'LineWidth',0.9, 'DisplayName','Slew Rate')
+hold on
+plot( t, cost_KF(:),'LineWidth',0.9, 'DisplayName','Uncertainty')
+plot( t, abs(cost_energy(:)),'LineWidth',0.9, 'DisplayName','Energy')
+plot( t, cost_slack(:),'LineWidth',0.9, 'DisplayName','Slack')
+xlabel('Time [s]')
+ylabel(sprintf('Cost'))
+title(sprintf('\\textbf{Weighted Costs}'))
+xlim([0 sim_time])
+allcosts = [cost_deltaU(:)' cost_KF(:)' abs(cost_energy(:))' cost_slack(:)'];
+ylim([1e-7 max(allcosts)*10])
+set(gca,'XTick',[0 2 4 6 8 0 ])
+set(gca,'YTick',[10^(-9) 10^(-6) 10^(-3) 10^0 10^3 10^6 10^9])
+set(gca,'YScale','log')
+lg = legend('Location','southeast', ...
+       'Interpreter','latex', ...
+       'FontSize',7);
+lg.ItemTokenSize = [9, 10];    % e.g. [length height] in pixels
+grid on
+hold off
+
+ % save as PDF
+print(hFig3, 'EnergyLevel.pdf', '-dpdf', '-bestfit');
