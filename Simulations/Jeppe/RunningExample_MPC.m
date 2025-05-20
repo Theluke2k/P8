@@ -20,8 +20,8 @@ T = diag(sc);
 rng(57)
 
 % MPC parameters
-Hp = 8;             % Prediction horizon
-Hu = 8;             % Control horizon
+Hp = 2;             % Prediction horizon
+Hu = 2;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
 cost_params = [0.1, 100, 0.01, 1e3];    % DeltaU, KF, Energy, Slack
 min_dist = 1;                  % Minimum distance between robots
