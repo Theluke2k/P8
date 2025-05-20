@@ -23,7 +23,7 @@ rng(57)
 Hp = 3;             % Prediction horizon
 Hu = 3;             % Control horizon
 mpc_params = [Hp, Hu];           % Hp, Hu
-cost_params = [0.1, 100, 1, 1e3];    % DeltaU, KF, Energy, Slack
+cost_params = [0.1, 1, 100, 1e3];    % DeltaU, KF, Energy, Slack
 min_dist = 1;                  % Minimum distance between robots
 
 % Map bounderies
@@ -35,8 +35,8 @@ map_bounds = [xmin, xmax, ymin, ymax];
 % True initial process states
 M_ref = 300;
 beta_ref = 0.05;
-xs_ref = 30;
-ys_ref = 30;
+xs_ref = 20;
+ys_ref = 20;
 M_dot_ref = 0;
 beta_dot_ref = 0;
 xs_dot_ref = 0;
@@ -45,10 +45,10 @@ z_0 = [M_ref; M_dot_ref; beta_ref; beta_dot_ref; xs_ref; xs_dot_ref; ys_ref; ys_
 Nx_p = length(z_0); % Number of states in process state vector
 
 % Guessed initial process states
-M_0 = 150;
-beta_0 = 0.025;
-xs_0 = 10;
-ys_0 = 10;
+M_0 = 300;
+beta_0 = 0.05;
+xs_0 = 20;
+ys_0 = 20;
 M_dot_0 = 0;
 beta_dot_0 = 0;
 xs_dot_0 = 0;
