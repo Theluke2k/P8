@@ -381,7 +381,7 @@ for k=2:K+1
     % set warm start to 1 after first iteration
     do_warm_start = 1; 
     
-    % Insert slack variables into respective variables for later plotting
+    % Insert cost variables into respective variables for later plotting
     cost_deltaU(k) = costs{1};
     cost_KF(k) = costs{2};
     cost_energy(k) = costs{3};
